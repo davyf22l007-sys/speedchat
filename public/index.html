@@ -1,0 +1,802 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>SpeedChat</title>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════
+     LOGIN
+═══════════════════════════════════════════════════════ -->
+<div id="login-screen" class="screen active">
+  <div class="login-card">
+
+    <div class="login-logo">
+      <div class="logo-icon">
+        <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 80 80" fill="none">
+          <g transform="translate(0, 5)">
+            <path d="M8 10 C8 6.69 10.69 4 14 4 L66 4 C69.31 4 72 6.69 72 10 L72 48 C72 51.31 69.31 54 66 54 L26 54 L14 68 L14 54 C10.69 54 8 51.31 8 48 Z" stroke="white" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round"/>
+            <line x1="18" y1="19" x2="46" y2="19" stroke="white" stroke-width="3" stroke-linecap="round"/>
+            <line x1="18" y1="28" x2="38" y2="28" stroke="white" stroke-width="3" stroke-linecap="round"/>
+            <line x1="18" y1="37" x2="30" y2="37" stroke="white" stroke-width="3" stroke-linecap="round"/>
+            <polyline points="56,15 47,33 54,33 42,55 61,31 53,31 62,15" stroke="white" stroke-width="2.8" stroke-linejoin="round" stroke-linecap="round" fill="none"/>
+          </g>
+        </svg>
+      </div>
+      <h1 class="logo-name">SpeedChat</h1>
+      <p class="logo-tagline">Rápido. Simples. Direto.</p>
+    </div>
+
+    <div class="auth-tabs">
+      <button class="auth-tab active" id="tab-login" onclick="switchTab('login')">Entrar</button>
+      <button class="auth-tab" id="tab-register" onclick="switchTab('register')">Criar conta</button>
+    </div>
+
+    <div class="login-form" id="form-login">
+      <div class="input-group">
+        <label for="username">Usuário</label>
+        <input type="text" id="username" placeholder="Seu nome de usuário" autocomplete="off" />
+      </div>
+      <div class="input-group">
+        <label for="password">Senha</label>
+        <div class="password-wrap">
+          <input type="password" id="password" placeholder="Sua senha" />
+          <button type="button" class="eye-btn" onclick="toggleEye('password', this)" tabindex="-1">
+            <svg class="eye-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8696a0" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+              <circle cx="12" cy="12" r="3"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+      <div id="login-error" class="login-error hidden"></div>
+      <button id="login-btn" class="btn-primary">Entrar</button>
+    </div>
+
+    <div class="login-form hidden" id="form-register">
+      <div class="input-group">
+        <label for="reg-username">Usuário</label>
+        <input type="text" id="reg-username" placeholder="Escolha um nome de usuário" autocomplete="off" />
+      </div>
+      <div class="input-group">
+        <label for="reg-password">Senha</label>
+        <div class="password-wrap">
+          <input type="password" id="reg-password" placeholder="Mínimo 6 caracteres" />
+          <button type="button" class="eye-btn" onclick="toggleEye('reg-password', this)" tabindex="-1">
+            <svg class="eye-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8696a0" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+              <circle cx="12" cy="12" r="3"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+      <div class="input-group">
+        <label for="reg-password2">Confirmar senha</label>
+        <div class="password-wrap">
+          <input type="password" id="reg-password2" placeholder="Repita a senha" oninput="checkPasswordMatch()" />
+          <button type="button" class="eye-btn" onclick="toggleEye('reg-password2', this)" tabindex="-1">
+            <svg class="eye-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8696a0" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+              <circle cx="12" cy="12" r="3"/>
+            </svg>
+          </button>
+          <span id="password-match-badge" class="pw-match-badge hidden"></span>
+        </div>
+      </div>
+      <div id="register-error" class="login-error hidden"></div>
+      <button id="register-btn" class="btn-primary">Criar conta</button>
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     ADMIN SCREEN
+═══════════════════════════════════════════════════════ -->
+<div id="admin-screen" class="screen">
+  <div class="admin-layout">
+    <div class="admin-sidebar">
+      <div class="admin-sidebar-header">
+        <div class="admin-logo">
+          <svg width="32" height="32" viewBox="0 0 80 80" fill="none">
+            <path d="M8 10 C8 6.69 10.69 4 14 4 L66 4 C69.31 4 72 6.69 72 10 L72 48 C72 51.31 69.31 54 66 54 L26 54 L14 68 L14 54 C10.69 54 8 51.31 8 48 Z" stroke="white" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <div class="admin-brand">
+          <span class="admin-brand-name">SpeedChat</span>
+          <span class="admin-brand-badge">Admin</span>
+        </div>
+      </div>
+      <div class="admin-user-info">
+        <div class="admin-avatar" id="admin-avatar"></div>
+        <span id="admin-username"></span>
+      </div>
+      <nav class="admin-nav">
+        <button class="admin-nav-item active" id="admin-nav-users" onclick="adminSwitchTab('users')">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/>
+            <circle cx="9" cy="7" r="4"/>
+            <path d="M23 21v-2a4 4 0 00-3-3.87"/>
+            <path d="M16 3.13a4 4 0 010 7.75"/>
+          </svg>
+          Usuários
+        </button>
+        <button class="admin-nav-item" id="admin-nav-back" onclick="adminGoBack()">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/>
+            <polyline points="16 17 21 12 16 7"/>
+            <line x1="21" y1="12" x2="9" y2="12"/>
+          </svg>
+          Voltar ao Chat
+        </button>
+      </nav>
+    </div>
+
+    <div class="admin-main">
+      <div class="admin-header">
+        <h1 class="admin-title" id="admin-title">Painel de Administração</h1>
+        <div class="admin-header-actions">
+          <button class="admin-refresh-btn" onclick="adminLoadUsers()" title="Atualizar">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="23 4 23 10 17 10"/>
+              <path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/>
+            </svg>
+          </button>
+          <button class="admin-logout-btn" onclick="adminLogout()">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/>
+              <polyline points="16 17 21 12 16 7"/>
+              <line x1="21" y1="12" x2="9" y2="12"/>
+            </svg>
+            Sair
+          </button>
+        </div>
+      </div>
+
+      <!-- Tab: Usuários -->
+      <div id="admin-tab-users" class="admin-tab-content active">
+        <div class="admin-stats" id="admin-stats"></div>
+        <div class="admin-table-wrap">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>Usuário</th>
+                <th>ID</th>
+                <th>Criado em</th>
+                <th>Tipo</th>
+                <th>Ações</th>
+              </tr>
+            </thead>
+            <tbody id="admin-users-tbody">
+              <tr><td colspan="5" class="admin-loading">Carregando...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Tab: Mensagens do Usuário -->
+      <div id="admin-tab-messages" class="admin-tab-content">
+        <div class="admin-msg-nav">
+          <button class="admin-back-btn" id="admin-back-from-msgs" onclick="adminBackToUsers()" title="Voltar para usuários">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="15 18 9 12 15 6"/>
+            </svg>
+            <span>Usuários</span>
+          </button>
+          <button class="admin-back-btn hidden" id="admin-back-from-room" onclick="adminBackToRooms()" title="Voltar para conversas">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="15 18 9 12 15 6"/>
+            </svg>
+            <span id="admin-back-room-label">Conversas</span>
+          </button>
+        </div>
+        <div id="admin-rooms-list" class="admin-rooms-container"></div>
+        <div id="admin-msg-content" class="admin-msgs-container hidden"></div>
+      </div>
+
+      <!-- Modal de editar usuário -->
+      <div id="admin-user-modal" class="admin-modal-overlay hidden" onclick="if(event.target===this)adminCloseModal()">
+        <div class="admin-modal-card">
+          <div class="admin-modal-header">
+            <h2 id="admin-modal-title">Gerenciar Usuário</h2>
+            <button class="admin-modal-close" onclick="adminCloseModal()">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+              </svg>
+            </button>
+          </div>
+          <div class="admin-modal-body">
+            <div class="admin-modal-user-info">
+              <div class="admin-modal-avatar" id="admin-modal-avatar"></div>
+              <div class="admin-modal-details">
+                <span class="admin-modal-name" id="admin-modal-name"></span>
+                <span class="admin-modal-id" id="admin-modal-id"></span>
+              </div>
+            </div>
+
+            <div class="admin-modal-section">
+              <h3>Alterar Nome</h3>
+              <div class="admin-input-group">
+                <input type="text" id="admin-edit-username" placeholder="Novo nome de usuário" maxlength="20" />
+                <button class="admin-btn admin-btn-sm" onclick="adminEditUsername()">Salvar</button>
+              </div>
+              <div id="admin-edit-username-error" class="admin-error hidden"></div>
+            </div>
+
+            <div class="admin-modal-section">
+              <h3>Alterar Senha</h3>
+              <div class="admin-input-group">
+                <input type="text" id="admin-edit-password" placeholder="Nova senha (mín. 6 caracteres)" />
+                <button class="admin-btn admin-btn-sm" onclick="adminEditPassword()">Alterar</button>
+              </div>
+              <div id="admin-edit-password-error" class="admin-error hidden"></div>
+            </div>
+
+            <div class="admin-modal-section admin-modal-section--danger">
+              <h3>Zona de Perigo</h3>
+              <p class="admin-danger-text">Esta ação é irreversível. Todos os dados do usuário serão perdidos.</p>
+              <button class="admin-btn admin-btn-danger" id="admin-delete-btn" onclick="adminDeleteUser()">Excluir Usuário</button>
+              <div id="admin-delete-error" class="admin-error hidden"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     APP
+═══════════════════════════════════════════════════════ -->
+<div id="app-screen" class="screen">
+  <div class="app-layout">
+
+    <!-- ══════════ SIDEBAR ══════════ -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-header-row">
+          <span class="sidebar-title">SpeedChat</span>
+          <div class="header-menu-wrap">
+            <button class="icon-btn" id="header-menu-btn" title="Menu">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="#54656f">
+                <circle cx="12" cy="5"  r="1.6"/>
+                <circle cx="12" cy="12" r="1.6"/>
+                <circle cx="12" cy="19" r="1.6"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="search-bar">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" >
+          <circle cx="11" cy="11" r="8" stroke="#8696a0" stroke-width="2"/>
+          <line x1="21" y1="21" x2="16.65" y2="16.65" stroke="#8696a0" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+        <input type="text" id="search-input" placeholder="Pesquisar conversas" />
+        <button class="search-new-chat-btn" id="search-new-chat-btn" title="Nova conversa">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#54656f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="12" y1="5" x2="12" y2="19"/>
+            <line x1="5" y1="12" x2="19" y2="12"/>
+          </svg>
+        </button>
+      </div>
+
+      <div class="chat-list" id="chat-list"></div>
+    </aside>
+
+    <!-- ══════════ MAIN ══════════ -->
+    <main class="chat-main">
+
+      <div id="empty-state" class="empty-state">
+        <svg width="72" height="72" viewBox="0 0 72 72" fill="none">
+          <circle cx="36" cy="36" r="36" fill="#dfe5e7"/>
+          <path d="M36 16C22.75 16 12 26.75 12 40c0 3.56.93 6.93 2.57 9.84L12 60l10.37-2.53A23.8 23.8 0 0036 60c13.25 0 24-10.75 24-24S49.25 16 36 16z" fill="#b2bec3"/>
+        </svg>
+        <h2>SpeedChat</h2>
+        <p>Selecione uma conversa para começar</p>
+      </div>
+
+      <div id="chat-view" class="chat-view hidden">
+        <div class="chat-header">
+          <button class="icon-btn back-btn" id="back-btn" title="Voltar">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#54656f" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="15 18 9 12 15 6"/>
+            </svg>
+          </button>
+
+          <div class="chat-header-info" id="chat-header-info">
+            <div class="avatar" id="chat-avatar"></div>
+            <div>
+              <div class="chat-name" id="chat-name"></div>
+              <div class="chat-status" id="chat-status">online</div>
+            </div>
+          </div>
+
+          <div class="chat-header-actions">
+            <!-- Search dentro do chat -->
+            <button class="icon-btn" id="chat-search-btn" title="Pesquisar mensagens">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#54656f" stroke-width="2" stroke-linecap="round">
+                <circle cx="11" cy="11" r="8"/>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+              </svg>
+            </button>
+            <button class="icon-btn" id="chat-menu-btn" title="Menu">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="#54656f">
+                <circle cx="12" cy="5"  r="1.6"/>
+                <circle cx="12" cy="12" r="1.6"/>
+                <circle cx="12" cy="19" r="1.6"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Barra de busca dentro do chat -->
+        <div class="chat-search-bar hidden" id="chat-search-bar">
+          <button class="icon-btn" id="chat-search-close" style="width:32px;height:32px">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#54656f" stroke-width="2.2" stroke-linecap="round">
+              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+          <input type="text" id="chat-search-input" placeholder="Pesquisar mensagens..." autocomplete="off" />
+          <span class="chat-search-count" id="chat-search-count"></span>
+        </div>
+
+        <!-- Área de mensagens -->
+        <div class="messages-area" id="messages-area">
+          <div class="messages-container" id="messages-container"></div>
+          <!-- Indicador de digitação -->
+          <div class="typing-indicator hidden" id="typing-indicator">
+            <span class="typing-dots"><span></span><span></span><span></span></span>
+            <span class="typing-text" id="typing-text"></span>
+          </div>
+          <!-- Botão scroll to bottom -->
+          <button class="scroll-down-btn hidden" id="scroll-down-btn" title="Ir para o final">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#54656f" stroke-width="2.5" stroke-linecap="round">
+              <polyline points="6 9 12 15 18 9"/>
+            </svg>
+            <span class="scroll-down-badge" id="scroll-down-badge"></span>
+          </button>
+        </div>
+
+        <!-- Quote preview -->
+        <div class="reply-preview hidden" id="reply-preview">
+          <div class="reply-preview-line"></div>
+          <div class="reply-preview-content">
+            <span class="reply-preview-author" id="reply-preview-author"></span>
+            <span class="reply-preview-text" id="reply-preview-text"></span>
+          </div>
+          <button class="reply-preview-close" id="reply-preview-close">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#54656f" stroke-width="2" stroke-linecap="round">
+              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+        </div>
+
+        <!-- Barra de input -->
+        <div class="message-input-area">
+          <div class="attach-wrap">
+            <button class="attach-btn" id="attach-btn" title="Anexar">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48" stroke="#54656f" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+            <div class="attach-menu hidden" id="attach-menu">
+              <button class="attach-menu-item" id="attach-image-btn">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="3" stroke="#54656f" stroke-width="1.8"/><circle cx="8.5" cy="8.5" r="1.5" fill="#54656f"/><path d="M21 15l-5-5L5 21" stroke="#54656f" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                Enviar Imagem
+              </button>
+              <button class="attach-menu-item" id="attach-doc-btn">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke="#54656f" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><polyline points="14 2 14 8 20 8" stroke="#54656f" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><line x1="9" y1="13" x2="15" y2="13" stroke="#54656f" stroke-width="1.8" stroke-linecap="round"/><line x1="9" y1="17" x2="13" y2="17" stroke="#54656f" stroke-width="1.8" stroke-linecap="round"/></svg>
+                Enviar Documento
+              </button>
+            </div>
+            <input type="file" id="image-file-input" accept="image/*" style="display:none" />
+            <input type="file" id="doc-file-input" accept="*/*" style="display:none" />
+          </div>
+
+          <div class="input-wrapper" id="input-wrapper">
+            <input type="text" id="message-input" placeholder="Mensagem" />
+          </div>
+
+          <button class="send-btn" id="send-btn" title="Enviar">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+              <path d="M3.4 2.1L21.5 11.3a.8.8 0 010 1.4L3.4 21.9a.8.8 0 01-1.1-.9l1.8-7.6a.8.8 0 01.6-.6l7.8-1.3a.2.2 0 000-.4L4.7 9.8a.8.8 0 01-.6-.6L2.3 3a.8.8 0 011.1-.9z" fill="white"/>
+            </svg>
+          </button>
+        </div>
+
+      </div>
+    </main>
+
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     MODAL — NOVA CONVERSA
+═══════════════════════════════════════════════════════ -->
+<div id="modal-overlay" class="modal-overlay hidden">
+  <div id="modal-search" class="modal-card">
+    <div class="modal-header">
+      <h2 class="modal-title">Nova Conversa</h2>
+      <button class="modal-close" id="modal-close-btn">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#54656f" stroke-width="2.2" stroke-linecap="round">
+          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+    </div>
+    <p class="modal-subtitle">Qual usuário deseja iniciar uma conversa?</p>
+    <p class="modal-hint">O usuário será procurado no banco de dados do sistema.</p>
+    <div class="modal-input-wrap">
+      <span class="modal-at">@ —</span>
+      <input type="text" id="modal-username-input" class="modal-input" placeholder="nome de usuário" autocomplete="off" spellcheck="false" />
+    </div>
+    <div id="modal-search-error" class="modal-error hidden"></div>
+    <button class="modal-btn-primary" id="modal-search-btn">Procurar</button>
+  </div>
+
+  <div id="modal-found" class="modal-card hidden">
+    <div class="modal-header">
+      <h2 class="modal-title">Usuário encontrado</h2>
+      <button class="modal-close" id="modal-found-close-btn">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#54656f" stroke-width="2.2" stroke-linecap="round">
+          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+    </div>
+    <div class="modal-profile">
+      <div class="modal-avatar" id="modal-found-avatar"></div>
+      <span class="modal-found-name" id="modal-found-name"></span>
+    </div>
+    <button class="modal-btn-primary" id="modal-start-btn">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" style="margin-right:8px"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Iniciar Conversa
+    </button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     MODAL — PERFIL
+═══════════════════════════════════════════════════════ -->
+<div id="profile-modal-overlay" class="modal-overlay hidden">
+  <div class="modal-card">
+    <div class="modal-header">
+      <h2 class="modal-title">Meu Perfil</h2>
+      <button class="modal-close" id="profile-modal-close">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#54656f" stroke-width="2.2" stroke-linecap="round">
+          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+    </div>
+    <div class="modal-profile">
+      <div class="modal-avatar" id="profile-avatar" style="width:80px;height:80px;font-size:32px;cursor:pointer;position:relative;overflow:hidden" onclick="document.getElementById('profile-avatar-input').click()">
+        <div class="avatar-overlay" id="profile-avatar-overlay">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
+        </div>
+      </div>
+      <input type="file" id="profile-avatar-input" accept="image/*" style="display:none" />
+    </div>
+    <div class="input-group">
+      <label for="profile-username">Nome de usuário</label>
+      <input type="text" id="profile-username" placeholder="Seu nome" maxlength="20" />
+    </div>
+    <div id="profile-error" class="login-error hidden"></div>
+    <button class="modal-btn-primary" id="profile-save-btn">Salvar</button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     MODAL — CONTEXTO DA MENSAGEM (editar/excluir)
+═══════════════════════════════════════════════════════ -->
+<div class="msg-context-menu hidden" id="msg-context-menu">
+  <button class="dropdown-item" id="msg-reply-btn">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3b4a54" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+    Responder
+  </button>
+  <button class="dropdown-item" id="msg-copy-btn">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3b4a54" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+    Copiar
+  </button>
+  <button class="dropdown-item" id="msg-edit-btn">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3b4a54" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+    Editar
+  </button>
+  <div class="dropdown-divider"></div>
+  <button class="dropdown-item dropdown-item--danger" id="msg-delete-btn">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#e53935" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>
+    Excluir
+  </button>
+</div>
+
+<!-- Dropdown sidebar -->
+<div class="header-dropdown hidden" id="header-dropdown">
+  <button class="dropdown-item" id="new-chat-btn">
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" stroke="#3b4a54" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><line x1="12" y1="8" x2="12" y2="14" stroke="#3b4a54" stroke-width="1.8" stroke-linecap="round"/><line x1="9" y1="11" x2="15" y2="11" stroke="#3b4a54" stroke-width="1.8" stroke-linecap="round"/></svg>
+    Nova Mensagem
+  </button>
+  <button class="dropdown-item hidden" id="dropdown-group-btn">
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#3b4a54" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+    Novo Grupo
+  </button>          <button class="dropdown-item" id="dropdown-profile-btn">
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#3b4a54" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+    Meu Perfil
+  </button>
+  <button class="dropdown-item" id="dropdown-customize-btn">
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#3b4a54" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+    Personalizar
+  </button>
+  <button class="dropdown-item hidden" id="dropdown-admin-btn">
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#3b4a54" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+    Painel Admin
+  </button>
+  <div class="dropdown-divider"></div>
+  <button class="dropdown-item" id="dropdown-theme-btn">
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#3b4a54" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
+    <span id="theme-btn-text">Tema Escuro</span>
+  </button>
+  <button class="dropdown-item dropdown-item--danger" id="logout-btn">
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#e53935" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+    Sair
+  </button>
+</div>
+
+<!-- Dropdown do chat -->
+<div class="header-dropdown hidden" id="chat-dropdown">
+  <button class="dropdown-item" id="clear-chat-btn">
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#3b4a54" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>
+    Limpar Conversa
+  </button>
+</div>
+
+<!-- Modal de imagem -->
+<div id="image-modal" class="hidden">
+  <div class="img-modal-toolbar">
+    <button class="img-modal-btn" id="img-modal-download" title="Baixar imagem">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
+    </button>
+    <button class="img-modal-btn" id="img-modal-close" title="Fechar">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+  </div>
+  <div class="img-modal-body">
+    <img id="img-modal-img" src="" alt="imagem ampliada" />
+  </div>
+  <div class="img-modal-bottom">
+    <button class="img-modal-btn" id="img-modal-zoom-out" title="Diminuir zoom">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    </button>
+    <span class="img-modal-zoom-label" id="img-modal-zoom-label">100%</span>
+    <button class="img-modal-btn" id="img-modal-zoom-in" title="Aumentar zoom">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    </button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     MODAL — CONFIRMACAO
+═══════════════════════════════════════════════════════ -->
+<div id="confirm-overlay" class="modal-overlay hidden" onclick="if(event.target===this)closeConfirm(false)">
+  <div class="confirm-modal-card">
+    <div class="confirm-modal-body">
+      <div class="confirm-modal-icon" id="confirm-icon">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#e53935" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"/>
+          <line x1="12" y1="8" x2="12" y2="12"/>
+          <line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+      </div>
+      <div class="confirm-modal-msg" id="confirm-msg">Tem certeza?</div>
+    </div>
+    <div class="confirm-modal-actions">
+      <button class="confirm-btn confirm-btn-cancel" id="confirm-cancel-btn">Cancelar</button>
+      <button class="confirm-btn confirm-btn-danger" id="confirm-ok-btn">Confirmar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     MODAL — NOVO GRUPO
+═══════════════════════════════════════════════════════ -->
+<div id="group-modal-overlay" class="modal-overlay hidden">
+  <div class="modal-card" style="max-width:440px">
+    <div class="modal-header">
+      <h2 class="modal-title">Criar Grupo</h2>
+      <button class="modal-close" id="group-modal-close">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#54656f" stroke-width="2.2" stroke-linecap="round">
+          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+    </div>
+    <p class="modal-subtitle">Dê um nome e selecione os participantes</p>
+
+    <div class="input-group">
+      <label for="group-name-input">Nome do grupo</label>
+      <input type="text" id="group-name-input" placeholder="Ex: Amigos do trabalho" maxlength="30" />
+    </div>
+
+    <div class="group-member-search">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#8696a0" stroke-width="2" stroke-linecap="round">
+        <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+      </svg>
+      <input type="text" id="group-member-filter" placeholder="Filtrar usuários..." />
+    </div>
+
+    <div class="group-user-list" id="group-user-list"></div>
+
+    <div id="group-modal-error" class="modal-error hidden"></div>
+    <button class="modal-btn-primary" id="group-create-btn">Criar Grupo</button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     MODAL — EDITAR GRUPO (nome + foto)
+═══════════════════════════════════════════════════════ -->
+<div id="edit-group-overlay" class="modal-overlay hidden">
+  <div class="modal-card" style="max-width:400px">
+    <div class="modal-header">
+      <h2 class="modal-title" id="edit-group-title">Editar Grupo</h2>
+      <button class="modal-close" id="edit-group-close">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#54656f" stroke-width="2.2" stroke-linecap="round">
+          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+    </div>
+
+    <div class="modal-profile">
+      <div class="modal-avatar" id="edit-group-avatar" style="width:80px;height:80px;font-size:32px;cursor:pointer;position:relative;overflow:hidden" onclick="document.getElementById('edit-group-avatar-input').click()">
+        <div class="avatar-overlay">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
+        </div>
+      </div>
+      <input type="file" id="edit-group-avatar-input" accept="image/*" style="display:none" />
+    </div>
+
+    <div class="input-group">
+      <label for="edit-group-name-input">Nome do grupo</label>
+      <input type="text" id="edit-group-name-input" placeholder="Nome do grupo" maxlength="30" />
+    </div>
+
+    <div id="edit-group-error" class="modal-error hidden"></div>
+    <button class="customize-reset-btn" id="edit-group-remove-photo" style="text-align:center">Remover foto do grupo</button>
+    <button class="modal-btn-primary" id="edit-group-save-btn">Salvar</button>
+    <button class="admin-btn admin-btn-danger" id="edit-group-delete-btn" style="margin-top:12px;width:100%">Deletar Grupo</button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     MODAL — MEMBROS DO GRUPO
+═══════════════════════════════════════════════════════ -->
+<div id="group-members-overlay" class="modal-overlay hidden">
+  <div class="modal-card" style="max-width:420px">
+    <div class="modal-header">
+      <h2 class="modal-title" id="group-members-title">Membros</h2>
+      <div class="modal-header-actions">
+        <button class="modal-header-btn hidden" id="group-members-edit-btn" title="Editar Grupo">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#54656f" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
+            <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+          </svg>
+        </button>
+        <button class="modal-close" id="group-members-close">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#54656f" stroke-width="2.2" stroke-linecap="round">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+    <p class="modal-subtitle" id="group-members-count">0 participantes</p>
+    <div class="group-members-list" id="group-members-list"></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     MODAL — PERSONALIZACAO (tema, cor, fundo)
+═══════════════════════════════════════════════════════ -->
+<div id="customize-modal-overlay" class="modal-overlay hidden">
+  <div class="customize-modal-card">
+    <div class="modal-header">
+      <h2 class="modal-title">Personalizar</h2>
+      <button class="modal-close" id="customize-modal-close">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#54656f" stroke-width="2.2" stroke-linecap="round">
+          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+    </div>
+
+    <div class="customize-scroll">
+      <!-- Tema -->
+      <div class="customize-section">
+        <h3 class="customize-section-title">Tema</h3>
+        <div class="theme-toggle-row">
+          <span class="theme-toggle-label">Modo escuro</span>
+          <label class="toggle-switch">
+            <input type="checkbox" id="customize-dark-toggle" />
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <div class="customize-divider"></div>
+
+      <!-- Fundo do Chat -->
+      <div class="customize-section">
+        <h3 class="customize-section-title">Fundo do Chat</h3>
+        <p class="customize-section-desc">Personalize o fundo da tela de conversas</p>
+
+        <div class="customize-color-grid" id="customize-bg-colors">
+          <button class="customize-color-btn" data-color="#e5ddd5" style="background:#e5ddd5" title="Padrão"></button>
+          <button class="customize-color-btn" data-color="#2a3b4c" style="background:#2a3b4c" title="Escuro"></button>
+          <button class="customize-color-btn" data-color="#1a2a1f" style="background:#1a2a1f" title="Verde escuro"></button>
+          <button class="customize-color-btn" data-color="#2c1e3f" style="background:#2c1e3f" title="Roxo"></button>
+          <button class="customize-color-btn" data-color="#1e2a3a" style="background:#1e2a3a" title="Azul escuro"></button>
+          <button class="customize-color-btn" data-color="#3e2723" style="background:#3e2723" title="Marrom"></button>
+          <button class="customize-color-btn" data-color="#b71c1c" style="background:#b71c1c" title="Vermelho"></button>
+          <button class="customize-color-btn" data-color="#1b5e20" style="background:#1b5e20" title="Verde"></button>
+          <button class="customize-color-btn" data-color="#0d47a1" style="background:#0d47a1" title="Azul"></button>
+          <button class="customize-color-btn" data-color="#4a148c" style="background:#4a148c" title="Roxo escuro"></button>
+        </div>
+
+        <button class="customize-upload-btn" id="customize-bg-upload-btn">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
+          Enviar imagem de fundo
+        </button>
+        <input type="file" id="customize-bg-input" accept="image/*" style="display:none" />
+        <button class="customize-reset-btn" id="customize-bg-reset">Remover fundo personalizado</button>
+      </div>
+
+      <div class="customize-divider"></div>
+
+      <!-- Cor da Bolha -->
+      <div class="customize-section">
+        <h3 class="customize-section-title">Cor das Minhas Mensagens</h3>
+        <p class="customize-section-desc">Escolha a cor do balão das suas mensagens enviadas</p>
+
+        <div class="customize-color-grid" id="customize-bubble-colors">
+          <button class="customize-color-btn customize-bubble-btn" data-bubble="#d4fdd2" style="background:#d4fdd2;border:2px solid #a8e6a3" title="Verde claro (padrão)"></button>
+          <button class="customize-color-btn customize-bubble-btn" data-bubble="#c8e6ff" style="background:#c8e6ff;border:2px solid #90caf9" title="Azul claro"></button>
+          <button class="customize-color-btn customize-bubble-btn" data-bubble="#ffcdd2" style="background:#ffcdd2;border:2px solid #ef9a9a" title="Vermelho claro"></button>
+          <button class="customize-color-btn customize-bubble-btn" data-bubble="#d1c4e9" style="background:#d1c4e9;border:2px solid #b39ddb" title="Roxo claro"></button>
+          <button class="customize-color-btn customize-bubble-btn" data-bubble="#ffe0b2" style="background:#ffe0b2;border:2px solid #ffcc80" title="Laranja claro"></button>
+          <button class="customize-color-btn customize-bubble-btn" data-bubble="#c8e6c9" style="background:#c8e6c9;border:2px solid #a5d6a7" title="Verde menta"></button>
+          <button class="customize-color-btn customize-bubble-btn" data-bubble="#f0f4c3" style="background:#f0f4c3;border:2px solid #e6ee9c" title="Amarelo claro"></button>
+          <button class="customize-color-btn customize-bubble-btn" data-bubble="#b2ebf2" style="background:#b2ebf2;border:2px solid #80deea" title="Ciano"></button>
+        </div>
+        
+        <div class="customize-bubble-preview" id="customize-bubble-preview">
+          <div class="message-row out" style="max-width:100%">
+            <div class="bubble" style="background:rgba(212, 253, 210, 0.78);border-color:rgba(180, 240, 175, 0.60);">
+              Preview da sua mensagem
+              <div class="bubble-meta"><span class="bubble-time">12:00</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="customize-divider"></div>
+
+      <!-- Cor de Destaque -->
+      <div class="customize-section">
+        <h3 class="customize-section-title">Cor de Destaque</h3>
+        <p class="customize-section-desc">Cor do botão enviar, badges e links</p>
+        <div class="customize-color-grid" id="customize-accent-colors">
+          <button class="customize-color-btn" data-accent="#6b7b8a" style="background:#6b7b8a" title="Cinza (padrão)"></button>
+          <button class="customize-color-btn" data-accent="#25d366" style="background:#25d366" title="Verde WhatsApp"></button>
+          <button class="customize-color-btn" data-accent="#0084ff" style="background:#0084ff" title="Azul"></button>
+          <button class="customize-color-btn" data-accent="#e91e63" style="background:#e91e63" title="Rosa"></button>
+          <button class="customize-color-btn" data-accent="#9c27b0" style="background:#9c27b0" title="Roxo"></button>
+          <button class="customize-color-btn" data-accent="#ff5722" style="background:#ff5722" title="Laranja"></button>
+          <button class="customize-color-btn" data-accent="#00bcd4" style="background:#00bcd4" title="Ciano"></button>
+          <button class="customize-color-btn" data-accent="#795548" style="background:#795548" title="Marrom"></button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="/js/app.js?v=2"></script>
+<script src="/js/admin.js?v=2"></script>
+</body>
+</html>

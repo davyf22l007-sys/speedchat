@@ -1,0 +1,12 @@
+node_modules/
+.env
+*.log
+.DS_Store
+_NUL
+nul
+cookies.txt
+cookies2.txt
+ngrok_log.txt
+server_log.txt
+iniciar_speedchat.bat
+server_log2.txt
