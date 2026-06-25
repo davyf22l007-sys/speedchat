@@ -18,6 +18,8 @@ let searchResults = [];
 let searchIndex = -1;
 // ── JOIN GROUP WITH PASSWORD ────────────────────────────────
 let passwordJoinRoomId = null;
+// Salas que já tiveram a senha verificada nesta sessão (evita loop modal)
+let passwordVerifiedRooms = new Set();
 
 function openPasswordModal(roomId, roomName) {
   passwordJoinRoomId = roomId;
@@ -76,7 +78,8 @@ document.getElementById('password-modal-btn').addEventListener('click', async ()
       return;
     }
 
-    // Entrou! Recarrega as salas e abre o grupo
+    // Entrou! Marca como verificado pra não pedir senha de novo
+    passwordVerifiedRooms.add(roomId);
     closePasswordModal();
     await loadRooms();
     const room = rooms.find(r => r.id === roomId);
@@ -407,8 +410,8 @@ async function openRoom(room) {
     }
   } catch {}
 
-  // Se o grupo tem senha, pede a senha pra todo mundo (inclusive membros)
-  if (room.hasPassword) {
+  // Se o grupo tem senha e ainda não foi verificada nesta sessão, pede a senha
+  if (room.hasPassword && !passwordVerifiedRooms.has(room.id)) {
     openPasswordModal(room.id, room.name);
     return;
   }
@@ -809,6 +812,8 @@ function connectWebSocket() {
           handleGroupDeleted(msg.roomId);
           break;
         case 'password_changed':
+          // Senha mudou — limpa verificações pra forçar redigitar
+          passwordVerifiedRooms.delete(msg.roomId);
           loadRooms();
           break;
       }
