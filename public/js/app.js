@@ -7,6 +7,10 @@ let pendingMessages = [];
 
 let isReconnecting = false;
 let rooms = [];
+
+let messagesCache = {};
+
+let isPrefetching = false;
 let replyToMsg = null;
 let editingMsgId = null;
 let contextMsgId = null;
@@ -100,6 +104,26 @@ function showApp() {
   updateAdminDropdownVisibility();
   loadRooms();
   connectWebSocket();
+  // Pre-carrega msgs em background
+  setTimeout(prefetchAllRooms, 500);
+}
+
+async function prefetchAllRooms() {
+  if (isPrefetching) return;
+  isPrefetching = true;
+  try {
+    const res = await fetch('/api/rooms');
+    if (!res.ok) { isPrefetching = false; return; }
+    const allRooms = await res.json();
+    const fetches = allRooms.map(async room => {
+      try {
+        const r = await fetch(`/api/rooms/${room.id}/messages`);
+        if (r.ok) messagesCache[room.id] = await r.json();
+      } catch {}
+    });
+    await Promise.all(fetches);
+  } catch {}
+  isPrefetching = false;
 }
 
 function switchTab(tab) {
@@ -265,10 +289,21 @@ async function openRoom(room) {
   const av = $('chat-avatar');
   renderAvatar(av, room.name, color, room.avatarData);
   $('chat-name').textContent = room.name;
-  const res = await fetch(`${API}/api/rooms/${room.id}/messages`);
-  if (!res.ok) return;
-  const messages = await res.json();
-  renderMessages(messages);
+
+  if (messagesCache[room.id]) {
+    renderMessages(messagesCache[room.id]);
+  } else {
+    $('messages-container').innerHTML = '<div class="admin-loading" style="padding:40px;text-align:center;color:var(--text-muted)">Carregando...</div>';
+  }
+
+  try {
+    const res = await fetch(`${API}/api/rooms/${room.id}/messages`);
+    if (res.ok) {
+      const messages = await res.json();
+      messagesCache[room.id] = messages;
+      if (currentRoomId === room.id) renderMessages(messages);
+    }
+  } catch {}
 }
 
 // ── MESSAGES ──────────────────────────────────────────────
