@@ -10,3 +10,6 @@ ngrok_log.txt
 server_log.txt
 iniciar_speedchat.bat
 server_log2.txt
+
+# banco de dados local — cada servidor mantem o seu
+data/db.json
