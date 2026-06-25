@@ -304,8 +304,9 @@ router.put('/profile', requireAuth, (req, res) => {
       if (m.authorId === req.userId) m.authorName = trimmed;
     });
     // Atualiza o nome que os OUTROS veem nas DMs com esse usuário
+    // Só atualiza dmNames das salas que o usuário realmente participa
     data.rooms.forEach(r => {
-      if (r.dmNames && r.members) {
+      if (r.dmNames && r.members && r.members.includes(req.userId)) {
         r.members.forEach(memberId => {
           if (memberId !== req.userId && r.dmNames[memberId]) {
             r.dmNames[memberId] = trimmed;
