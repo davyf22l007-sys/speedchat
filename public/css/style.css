@@ -3516,6 +3516,21 @@ button:focus, button:focus-visible { outline: none !important; box-shadow: none;
   border-color: rgba(255, 255, 255, 0.08);
 }
 
+/* ── TICK SENDING (reloginho animado igual zap) ── */
+.tick-sending {
+  display: flex;
+  align-items: center;
+}
+
+.clock-spin {
+  animation: clockSpin 1.2s linear infinite;
+}
+
+@keyframes clockSpin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
 /* ── TICK READ ── */
 .tick-read path { stroke: #53bdeb !important; }
 

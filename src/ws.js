@@ -129,6 +129,11 @@ function handleMessage(clientId, msg) {
     deleted: false
   };
 
+  // Ecoa o _pendingId de volta pro frontend saber qual pending message atualizar
+  if (msg._pendingId) {
+    message._pendingId = msg._pendingId;
+  }
+
   if (replyTo) {
     const original = data.messages.find(m => m.id === replyTo);
     if (original && original.roomId === roomId && !original.deleted) {

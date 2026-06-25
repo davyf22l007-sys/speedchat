@@ -401,8 +401,15 @@ function buildBubble(msg) {
   const time = formatTime(msg.timestamp);
   const color = authorColor(msg.authorName);
 
-  const tickSvg = msg.read ? `<span class="tick tick-read"><svg width="16" height="11" viewBox="0 0 16 11" fill="none"><path d="M1 6.5L5 10.5L15 0.5" stroke="#53bdeb" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 10.5L15 0.5" stroke="#53bdeb" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></span>`
-    : `<span class="tick"><svg width="16" height="11" viewBox="0 0 16 11" fill="none"><path d="M1 6.5L5 10.5L15 0.5" stroke="#667781" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 10.5L15 0.5" stroke="#667781" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></span>`;
+  let statusHtml = '';
+  if (msg.status === 'sending') {
+    // Reloginho de enviando (igual zap)
+    statusHtml = `<span class="tick tick-sending"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#667781" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="clock-spin"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span>`;
+  } else if (msg.read) {
+    statusHtml = `<span class="tick tick-read"><svg width="16" height="11" viewBox="0 0 16 11" fill="none"><path d="M1 6.5L5 10.5L15 0.5" stroke="#53bdeb" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 10.5L15 0.5" stroke="#53bdeb" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></span>`;
+  } else {
+    statusHtml = `<span class="tick"><svg width="16" height="11" viewBox="0 0 16 11" fill="none"><path d="M1 6.5L5 10.5L15 0.5" stroke="#667781" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 10.5L15 0.5" stroke="#667781" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></span>`;
+  }
 
   // Reply quote
   let replyHtml = '';
@@ -452,7 +459,7 @@ function buildBubble(msg) {
       ${bubbleContent}
       <div class="bubble-meta">
         <span class="bubble-time">${time}${isEdited ? ' <span style="font-size:10px;opacity:.6">editado</span>' : ''}</span>
-        ${isOut && !isDeleted ? tickSvg : ''}
+        ${isOut && !isDeleted ? statusHtml : ''}
       </div>
     </div>`;
 
@@ -606,15 +613,21 @@ function sendMessage() {
     return;
   }
 
-  const payload = { type: 'send_message', roomId: currentRoomId, content };
+  const pendingId = 'pending_' + Date.now();
+
+  // Guarda no array de pending (pra reenviar se cair)
+  const pendingEntry = { id: pendingId, roomId: currentRoomId, content, replyTo: replyToMsg ? replyToMsg.id : null };
+  pendingMessages.push(pendingEntry);
+
+  const payload = { type: 'send_message', roomId: currentRoomId, content, _pendingId: pendingId };
   if (replyToMsg) {
     payload.replyTo = replyToMsg.id;
   }
   ws.send(JSON.stringify(payload));
 
-  // Mensagem local (otimista)
-  const localMsg = {
-    id: 'tmp_' + Date.now(),
+  // Mensagem com status 'sending' (vai mostrar reloginho igual zap)
+  const pendingMsg = {
+    id: pendingId,
     roomId: currentRoomId,
     authorId: currentUser.id,
     authorName: currentUser.username,
@@ -622,13 +635,14 @@ function sendMessage() {
     type: 'text',
     timestamp: new Date().toISOString(),
     deleted: false,
-    edited: false
+    edited: false,
+    status: 'sending'
   };
   if (replyToMsg) {
-    localMsg.replyTo = replyToMsg;
+    pendingMsg.replyTo = replyToMsg;
   }
-  appendMessage(localMsg);
-  updateRoomPreview(localMsg);
+  appendMessage(pendingMsg);
+  updateRoomPreview(pendingMsg);
   cancelReply();
   input.value = '';
   input.focus();
@@ -761,26 +775,22 @@ function updateTypingUI(roomId) {
 }
 
 async function handleNewMessage(message) {
-  // Se for mensagem do próprio usuário: já temos a mensagem local otimista
-  // Só atualiza o ID da temporária pro ID real do servidor
-  if (message.authorId === currentUser.id) {
-    const tmpRows = document.querySelectorAll(`.message-row[data-msg-id^="tmp_"]`);
-    let found = false;
-    for (const row of tmpRows) {
-      if (row.classList.contains('out')) {
-        const bubbleText = row.querySelector('.bubble')?.textContent?.trim();
-        const msgText = message.content?.trim();
-        if (bubbleText === msgText) {
-          row.dataset.msgId = message.id;
-          found = true;
-          break;
-        }
+  // Se for mensagem do próprio usuário: usa _pendingId pra fazer match direto
+  if (message.authorId === currentUser.id && message._pendingId) {
+    // Remove do array de pendingMessages
+    const pendingIdx = pendingMessages.findIndex(p => p.id === message._pendingId);
+    if (pendingIdx !== -1) pendingMessages.splice(pendingIdx, 1);
+
+    // Atualiza a row na DOM: troca o ID pending pelo real e o reloginho pelo tick
+    const pendingRow = document.querySelector(`.message-row[data-msg-id="${message._pendingId}"]`);
+    if (pendingRow) {
+      pendingRow.dataset.msgId = message.id;
+      const tickEl = pendingRow.querySelector('.tick');
+      if (tickEl) {
+        tickEl.className = 'tick';
+        tickEl.innerHTML = `<svg width="16" height="11" viewBox="0 0 16 11" fill="none"><path d="M1 6.5L5 10.5L15 0.5" stroke="#667781" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 10.5L15 0.5" stroke="#667781" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
       }
-    }
-    if (found) {
-      // Remove tmp leftovers (se houver) antes de sair
-      document.querySelectorAll(`.message-row[data-msg-id^="tmp_"]`).forEach(el => el.remove());
-      return;
+      return; // Não adiciona de novo
     }
   }
 
@@ -1291,11 +1301,14 @@ $('image-file-input').addEventListener('change', async e => {
     const json = await res.json();
     if (!res.ok) throw new Error(json.error || 'Falha no upload');
     const url = json.url;
+    const url = json.url;
     loadingRow.remove();
-    ws.send(JSON.stringify({ type: 'send_message', roomId: currentRoomId, content: url, msgType: 'image' }));
-    const localMsg = { id: 'tmp_' + Date.now(), roomId: currentRoomId, authorId: currentUser.id, authorName: currentUser.username, content: url, type: 'image', timestamp: new Date().toISOString() };
-    appendMessage(localMsg);
-    updateRoomPreview({ ...localMsg, content: '📷 Imagem' });
+    const pendingId = 'pending_' + Date.now();
+    pendingMessages.push({ id: pendingId, roomId: currentRoomId, content: url, msgType: 'image', replyTo: null });
+    ws.send(JSON.stringify({ type: 'send_message', roomId: currentRoomId, content: url, msgType: 'image', _pendingId: pendingId }));
+    const pendingMsg = { id: pendingId, roomId: currentRoomId, authorId: currentUser.id, authorName: currentUser.username, content: url, type: 'image', timestamp: new Date().toISOString(), status: 'sending' };
+    appendMessage(pendingMsg);
+    updateRoomPreview({ ...pendingMsg, content: '📷 Imagem' });
   } catch (err) {
     loadingRow.remove();
     const errRow = document.createElement('div');
@@ -2024,10 +2037,12 @@ $('doc-file-input').addEventListener('change', async e => {
     const dataUrl = `data:${file.type || 'application/octet-stream'};base64,${base64}`;
     const content = JSON.stringify({ name: file.name, data: dataUrl });
     loadingRow.remove();
-    ws.send(JSON.stringify({ type: 'send_message', roomId: currentRoomId, content, msgType: 'file' }));
-    const localMsg = { id: 'tmp_' + Date.now(), roomId: currentRoomId, authorId: currentUser.id, authorName: currentUser.username, content, type: 'file', timestamp: new Date().toISOString() };
-    appendMessage(localMsg);
-    updateRoomPreview({ ...localMsg, content: '📄 ' + file.name });
+    const pendingId = 'pending_' + Date.now();
+    pendingMessages.push({ id: pendingId, roomId: currentRoomId, content, msgType: 'file', replyTo: null });
+    ws.send(JSON.stringify({ type: 'send_message', roomId: currentRoomId, content, msgType: 'file', _pendingId: pendingId }));
+    const pendingMsg = { id: pendingId, roomId: currentRoomId, authorId: currentUser.id, authorName: currentUser.username, content, type: 'file', timestamp: new Date().toISOString(), status: 'sending' };
+    appendMessage(pendingMsg);
+    updateRoomPreview({ ...pendingMsg, content: '📄 ' + file.name });
   } catch (err) {
     loadingRow.remove();
     const errRow = document.createElement('div');
