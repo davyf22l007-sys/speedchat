@@ -2,7 +2,8 @@ const { v4: uuidv4 } = require('uuid');
 const db = require('./db');
 
 const clients = new Map();
-const typingTimers = new Map(); // roomId -> Set<username>
+const typingTimers = new Map();
+const recentMessages = new Map(); // dedup: authorId+content -> timestamp // roomId -> Set<username>
 
 function setupWebSocket(wss) {
   wss.on('connection', (ws, req) => {
@@ -72,6 +73,23 @@ function setupWebSocket(wss) {
 }
 
 function handleMessage(clientId, msg) {
+  // Dedup: ignorar mesma mensagem em menos de 3s
+  if (msg.content) {
+    const dedupKey = clientId + ':' + msg.content + ':' + (msg.roomId || '');
+    const now = Date.now();
+    if (recentMessages.has(dedupKey)) {
+      const last = recentMessages.get(dedupKey);
+      if (now - last < 3000) return;
+    }
+    recentMessages.set(dedupKey, now);
+    // Limpar entradas antigas a cada 50 mensagens
+    if (recentMessages.size > 50) {
+      const cutoff = now - 10000;
+      for (const [k, t] of recentMessages) {
+        if (t < cutoff) recentMessages.delete(k);
+      }
+    }
+  }
   const client = clients.get(clientId);
   if (!client) return;
 

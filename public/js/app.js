@@ -1,7 +1,9 @@
 const API = '';
 let currentUser = null;
 let currentRoomId = null;
-let ws = null;
+let ws = null;
+let pendingMessages = [];
+let isReconnecting = false;
 let rooms = [];
 let replyToMsg = null;
 let editingMsgId = null;
@@ -569,6 +571,14 @@ function connectWebSocket() {
 
   ws.addEventListener('open', () => {
     wsRetryDelay = 1000;
+    isReconnecting = false;
+    // Enviar mensagens pendentes
+    const toSend = pendingMessages.splice(0);
+    toSend.forEach(p => {
+      const payload = { type: 'send_message', roomId: p.roomId, content: p.content };
+      if (p.replyTo) payload.replyTo = p.replyTo;
+      try { ws.send(JSON.stringify(payload)); } catch(e) {}
+    });
   });
 
   ws.addEventListener('message', e => {
@@ -610,6 +620,7 @@ function connectWebSocket() {
 
   ws.addEventListener('close', () => {
     ws = null;
+    isReconnecting = true;
     setTimeout(connectWebSocket, wsRetryDelay);
     wsRetryDelay = Math.min(wsRetryDelay * 2, 15000);
   });
