@@ -1,8 +1,10 @@
 const API = '';
 let currentUser = null;
 let currentRoomId = null;
-let ws = null;
-let pendingMessages = [];
+let ws = null;
+
+let pendingMessages = [];
+
 let isReconnecting = false;
 let rooms = [];
 let replyToMsg = null;
