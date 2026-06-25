@@ -7,6 +7,11 @@ const DB_PATH = path.resolve(__dirname, '../data/db.json');
 const ADMIN_USERNAME = process.env.ADMIN_USER || 'davyf22l';
 const ADMIN_PASSWORD = process.env.ADMIN_PASS || '@Davyf22l5820';
 
+// Cache em memoria - evita ler do disco em toda requisicao
+let cache = null;
+let saveTimer = null;
+let isSaving = false;
+
 function getInitialData() {
   const adminHash = bcrypt.hashSync(ADMIN_PASSWORD, 10);
   const adminId = 'user_admin';
@@ -40,9 +45,7 @@ function getInitialData() {
 function ensureAdmin(data) {
   const exists = data.users.find(u => u.id === 'user_admin' || u.isAdmin === true);
   if (exists) {
-    // Garante que o admin existente tenha isAdmin
     exists.isAdmin = true;
-    // Garante que o admin seja membro da sala Geral
     const general = data.rooms.find(r => r.id === 'room_general');
     if (general && !general.members.includes(exists.id)) {
       general.members.push(exists.id);
@@ -59,7 +62,6 @@ function ensureAdmin(data) {
     isAdmin: true,
     createdAt: new Date().toISOString()
   });
-  // Adiciona o novo admin na sala Geral
   const general = data.rooms.find(r => r.id === 'room_general');
   if (general && !general.members.includes(adminId)) {
     general.members.push(adminId);
@@ -67,7 +69,7 @@ function ensureAdmin(data) {
   return true;
 }
 
-function read() {
+function loadFromDisk() {
   if (!fs.existsSync(DB_PATH)) {
     const data = getInitialData();
     fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
@@ -76,16 +78,50 @@ function read() {
   }
   const raw = fs.readFileSync(DB_PATH, 'utf-8');
   const data = JSON.parse(raw);
-  // Garante que sempre exista um admin
   if (ensureAdmin(data)) {
-    write(data);
+    scheduleSave(data);
   }
   return data;
 }
 
-function write(data) {
-  fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
-  fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 2), 'utf-8');
+function saveToDisk(data) {
+  try {
+    fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
+    fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 2), 'utf-8');
+  } catch (err) {
+    console.error('Erro ao salvar db.json:', err.message);
+  }
 }
 
-module.exports = { read, write };
+function scheduleSave(data) {
+  if (saveTimer) clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    saveToDisk(data);
+    saveTimer = null;
+  }, 200);
+}
+
+// --- API PUBLICA ---
+
+function read() {
+  if (!cache) {
+    cache = loadFromDisk();
+  }
+  return cache;
+}
+
+function write(data) {
+  cache = data;
+  scheduleSave(data);
+}
+
+// Forca save imediato (pra usar antes de desligar)
+function flush() {
+  if (cache) {
+    if (saveTimer) clearTimeout(saveTimer);
+    saveTimer = null;
+    saveToDisk(cache);
+  }
+}
+
+module.exports = { read, write, flush };

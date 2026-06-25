@@ -35,3 +35,16 @@ const PUBLIC_URL = process.env.PUBLIC_URL || `http://localhost:${PORT}`;
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`SpeedChat rodando em ${PUBLIC_URL}`);
 });
+
+// Salva dados em disco antes de desligar
+const db = require('./db');
+process.on('SIGTERM', () => {
+  console.log('SIGTERM recebido, salvando dados...');
+  db.flush();
+  process.exit(0);
+});
+process.on('SIGINT', () => {
+  console.log('SIGINT recebido, salvando dados...');
+  db.flush();
+  process.exit(0);
+});
