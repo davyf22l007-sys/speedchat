@@ -18,6 +18,7 @@ function showAdminScreen(user) {
   }
   document.getElementById('admin-username').textContent = user.username;
 
+  adminCheckMobile();
   adminLoadUsers();
 }
 
@@ -26,6 +27,8 @@ function adminSwitchTab(tab) {
   document.querySelectorAll('.admin-nav-item').forEach(el => el.classList.remove('active'));
   document.getElementById(`admin-tab-${tab}`).classList.add('active');
   document.getElementById(`admin-nav-${tab}`).classList.add('active');
+  // Fecha sidebar no mobile
+  adminCloseSidebar();
   // Se for a tab de grupos, carrega os grupos
   if (tab === 'groups') {
     adminLoadGroups();
@@ -40,6 +43,34 @@ function adminGoBack() {
   if (typeof connectWebSocket === 'function') connectWebSocket();
   if (typeof updateAdminDropdownVisibility === 'function') updateAdminDropdownVisibility();
 }
+
+// ── MOBILE: toggle sidebar ────────────────────────────────
+function adminToggleSidebar() {
+  const sidebar = document.querySelector('.admin-sidebar');
+  const overlay = document.getElementById('admin-sidebar-overlay');
+  sidebar.classList.toggle('open');
+  overlay.classList.toggle('hidden');
+}
+
+function adminCloseSidebar() {
+  const sidebar = document.querySelector('.admin-sidebar');
+  const overlay = document.getElementById('admin-sidebar-overlay');
+  sidebar.classList.remove('open');
+  overlay.classList.add('hidden');
+}
+
+// Detecta se é mobile pra mostrar o hamburger
+function adminCheckMobile() {
+  const menuBtn = document.getElementById('admin-menu-btn');
+  if (window.innerWidth <= 768) {
+    menuBtn.classList.remove('hidden');
+  } else {
+    menuBtn.classList.add('hidden');
+    adminCloseSidebar();
+  }
+}
+
+window.addEventListener('resize', adminCheckMobile);
 
 // ── ADMIN MESSAGES VIEW ─────────────────────────────────────
 let adminViewingUserId = null;
@@ -58,6 +89,9 @@ function adminViewMessages(userId, username) {
   // Controla visibilidade dos back buttons
   document.getElementById('admin-back-from-msgs').classList.remove('hidden');
   document.getElementById('admin-back-from-room').classList.add('hidden');
+
+  // Fecha sidebar no mobile
+  adminCloseSidebar();
 
   adminLoadUserRooms(userId);
 }
@@ -257,6 +291,25 @@ function renderUserTable(users) {
       ? `<img src="${escapeHtml(u.avatarData)}" class="admin-table-avatar-img" alt="">`
       : `<span style="background:${avColor}">${u.username[0].toUpperCase()}</span>`;
 
+    // Seta o data-user-id e o onclick pra expandir ações no mobile
+    tr.dataset.userId = u.id;
+
+    const actionsHtml = !u.isSuperAdmin ? `
+      <button class="admin-btn admin-btn-sm admin-btn-msg" onclick="event.stopPropagation(); adminViewMessages('${u.id}', '${escapeHtml(u.username)}')" title="Ver conversas">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
+        </svg>
+        Msgs
+      </button>
+      <button class="admin-btn admin-btn-sm admin-btn-admin" onclick="event.stopPropagation(); adminOpenModal('${u.id}')" title="Gerenciar usuário">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
+          <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+        </svg>
+        Gerenciar
+      </button>
+    ` : '';
+
     tr.innerHTML = `
       <td>
         <div class="admin-user-cell">
@@ -265,36 +318,42 @@ function renderUserTable(users) {
             <span class="admin-user-name">${escapeHtml(u.username)}${isYou ? ' <span class="admin-you-badge">(você)</span>' : ''}</span>
           </div>
         </div>
+        ${actionsHtml ? `<div class="admin-row-actions-mobile">${actionsHtml}</div>` : ''}
       </td>
       <td class="admin-cell-mono">${escapeHtml(u.id)}</td>
       <td>${created}</td>
-      <td>${u.isAdmin ? '<span class="admin-badge admin-badge--admin">Admin</span>' : '<span class="admin-badge admin-badge--user">Usuário</span>'}</td>
-      <td class="admin-actions-cell">
-        ${!u.isAdmin ? `
-          <button class="admin-btn admin-btn-sm admin-btn-msg" onclick="adminViewMessages('${u.id}', '${escapeHtml(u.username)}')" title="Ver conversas">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
-            </svg>
-            Msgs
-          </button>
-          <button class="admin-btn admin-btn-sm admin-btn-admin" onclick="adminOpenModal('${u.id}')" title="Gerenciar usuário">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
-              <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
-            </svg>
-            Gerenciar
-          </button>
-        ` : '<span class="admin-muted">—</span>'}
-      </td>
+      <td>${u.isSuperAdmin ? '<span class="admin-badge admin-badge--superadmin"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style="margin-right:3px;vertical-align:-1px"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>Super Admin</span>' : u.isAdmin ? '<span class="admin-badge admin-badge--admin">Admin</span>' : '<span class="admin-badge admin-badge--user">Usuário</span>'}</td>
+      <td class="admin-actions-cell">${actionsHtml || '<span class="admin-muted">—</span>'}</td>
     `;
     tbody.appendChild(tr);
   });
+
+  // Adiciona evento de clique na tabela pra expandir ações no mobile (só uma vez)
+  if (!tbody._delegateAdded) {
+    tbody._delegateAdded = true;
+    tbody.addEventListener('click', function(e) {
+      // Só funciona no mobile
+      if (window.innerWidth > 768) return;
+      // Se clicou num botao, nao faz nada
+      if (e.target.closest('button')) return;
+      // Encontra a linha clicada
+      const row = e.target.closest('tr');
+      if (!row) return;
+      // Se for super admin, nao expande (nao tem acoes)
+      const user = adminUsers.find(u => u.id === row.dataset.userId);
+      if (user && user.isSuperAdmin) return;
+      // Toggle expanded
+      row.classList.toggle('expanded');
+    });
+  }
 }
 
 // ── MODAL ─────────────────────────────────────────────────
 function adminOpenModal(userId) {
   adminSelectedUserId = userId;
   const user = adminUsers.find(u => u.id === userId);
+
+  adminCloseSidebar();
   if (!user) return;
 
   document.getElementById('admin-modal-title').textContent = `Gerenciar: ${escapeHtml(user.username)}`;
@@ -315,6 +374,26 @@ function adminOpenModal(userId) {
   document.getElementById('admin-edit-username-error').classList.add('hidden');
   document.getElementById('admin-edit-password-error').classList.add('hidden');
   document.getElementById('admin-delete-error').classList.add('hidden');
+  document.getElementById('admin-toggle-error').classList.add('hidden');
+
+  // Mostra/esconde seção de toggle admin baseado em quem tá logado
+  const adminSection = document.getElementById('admin-modal-admin-section');
+  if (adminCurrentUser && adminCurrentUser.isSuperAdmin && !user.isSuperAdmin) {
+    adminSection.classList.remove('hidden');
+    const toggleBtn = document.getElementById('admin-toggle-admin-btn');
+    if (user.isAdmin) {
+      toggleBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg> Remover Admin';
+      toggleBtn.className = 'admin-btn admin-btn-sm admin-btn-danger';
+    } else {
+      toggleBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> Tornar Admin';
+      toggleBtn.className = 'admin-btn admin-btn-sm admin-btn-admin';
+    }
+    // Guarda o target
+    document.getElementById('admin-toggle-admin-btn').dataset.targetId = userId;
+    document.getElementById('admin-toggle-admin-btn').dataset.isCurrentlyAdmin = user.isAdmin ? '1' : '0';
+  } else {
+    adminSection.classList.add('hidden');
+  }
 
   document.getElementById('admin-user-modal').classList.remove('hidden');
 }
@@ -428,6 +507,46 @@ async function adminDeleteUser() {
 
 // ── TOAST (usa a função do app.js) ──────────────────────────
 // showToast e escapeHtml já estão definidas em app.js
+
+// ── TOGGLE ADMIN (promover/rebaixar) ───────────────────────
+async function adminToggleAdmin() {
+  const btn = document.getElementById('admin-toggle-admin-btn');
+  const errorEl = document.getElementById('admin-toggle-error');
+  errorEl.classList.add('hidden');
+
+  const userId = btn.dataset.targetId;
+  const isCurrentlyAdmin = btn.dataset.isCurrentlyAdmin === '1';
+  const newIsAdmin = !isCurrentlyAdmin;
+
+  const user = adminUsers.find(u => u.id === userId);
+  if (!user) return;
+
+  const action = newIsAdmin ? 'promover' : 'rebaixar';
+  const ok = await showConfirm(`Tem certeza que deseja ${action} ${escapeHtml(user.username)}?`);
+  if (!ok) return;
+
+  try {
+    const res = await fetch(`${API}/admin/users/${userId}/toggle-admin`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ isAdmin: newIsAdmin })
+    });
+
+    if (!res.ok) {
+      const err = await res.json();
+      errorEl.textContent = err.error || 'Erro ao alterar administrador.';
+      errorEl.classList.remove('hidden');
+      return;
+    }
+
+    adminCloseModal();
+    adminLoadUsers();
+    showToast(newIsAdmin ? 'Usuário promovido a administrador!' : 'Administrador rebaixado.');
+  } catch {
+    errorEl.textContent = 'Erro de conexão.';
+    errorEl.classList.remove('hidden');
+  }
+}
 
 // ── ADMIN GROUPS (Grupos Globais) ─────────────────────────
 async function adminLoadGroups() {

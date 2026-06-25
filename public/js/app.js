@@ -133,11 +133,8 @@ async function init() {
     const res = await fetch(`${API}/auth/me`);
     if (res.ok) {
       currentUser = await res.json();
-      if (currentUser.isAdmin) {
-        showAdminScreen(currentUser);
-      } else {
-        showApp();
-      }
+      showApp();
+      // Admin pode acessar o painel pelo menu dropdown
     } else {
       showLogin();
     }
@@ -211,11 +208,8 @@ $('login-btn').addEventListener('click', async () => {
   });
   if (res.ok) {
     currentUser = await res.json();
-    if (currentUser.isAdmin) {
-      showAdminScreen(currentUser);
-    } else {
-      showApp();
-    }
+    showApp();
+    // Admin pode acessar o painel pelo menu dropdown
   } else {
     const err = await res.json();
     errorEl.textContent = err.error || 'Erro ao entrar.';
@@ -249,11 +243,8 @@ $('register-btn').addEventListener('click', async () => {
   });
   if (res.ok) {
     currentUser = await res.json();
-    if (currentUser.isAdmin) {
-      showAdminScreen(currentUser);
-    } else {
-      showApp();
-    }
+    showApp();
+    // Admin pode acessar o painel pelo menu dropdown
   } else {
     const err = await res.json();
     errorEl.textContent = err.error || 'Erro ao criar conta.';

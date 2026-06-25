@@ -79,7 +79,8 @@ router.post('/register', (req, res) => {
     avatarColor: newUser.avatarColor,
     avatarData: newUser.avatarData || null,
     bio: newUser.bio || '',
-    isAdmin: newUser.isAdmin || false
+    isAdmin: newUser.isAdmin || false,
+    isSuperAdmin: newUser.isSuperAdmin || false
   });
 });
 
@@ -113,7 +114,8 @@ router.post('/login', (req, res) => {
     avatarColor: user.avatarColor,
     avatarData: user.avatarData || null,
     bio: user.bio || '',
-    isAdmin: user.isAdmin || false
+    isAdmin: user.isAdmin || false,
+    isSuperAdmin: user.isSuperAdmin || false
   });
 });
 
@@ -147,7 +149,8 @@ router.get('/me', (req, res) => {
     avatarColor: user.avatarColor,
     avatarData: user.avatarData || null,
     bio: user.bio || '',
-    isAdmin: user.isAdmin || false
+    isAdmin: user.isAdmin || false,
+    isSuperAdmin: user.isSuperAdmin || false
   });
 });
 

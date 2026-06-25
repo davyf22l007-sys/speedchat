@@ -18,7 +18,17 @@ function requireAdmin(req, res, next) {
 
   req.userId = user.id;
   req.adminUser = user;
+  req.isSuperAdmin = user.isSuperAdmin || false;
   next();
+}
+
+function requireSuperAdmin(req, res, next) {
+  requireAdmin(req, res, () => {
+    if (!req.isSuperAdmin) {
+      return res.status(403).json({ error: 'Acesso negado. Apenas o super administrador pode fazer isso.' });
+    }
+    next();
+  });
 }
 
 // ── LISTAR TODOS OS USUÁRIOS ──────────────────────────────
@@ -30,6 +40,7 @@ router.get('/users', requireAdmin, (req, res) => {
     avatarColor: u.avatarColor,
     avatarData: u.avatarData || null,
     isAdmin: u.isAdmin || false,
+    isSuperAdmin: u.isSuperAdmin || false,
     createdAt: u.createdAt
   }));
   res.json(users);
@@ -52,8 +63,14 @@ router.delete('/users/:userId', requireAdmin, (req, res) => {
 
   const user = data.users[userIndex];
 
-  if (user.isAdmin) {
-    return res.status(400).json({ error: 'Você não pode deletar outro administrador.' });
+  // Proteção: ninguém pode deletar o super admin
+  if (user.isSuperAdmin) {
+    return res.status(400).json({ error: 'Você não pode deletar o super administrador.' });
+  }
+
+  // Admin comum não pode deletar outro admin
+  if (user.isAdmin && !req.isSuperAdmin) {
+    return res.status(400).json({ error: 'Apenas o super administrador pode deletar outros administradores.' });
   }
 
   // Remove o usuário
@@ -294,6 +311,38 @@ router.post('/rooms/:roomId/add-all-users', requireAdmin, (req, res) => {
   db.write(data);
 
   res.json({ ok: true, added });
+});
+
+// ── ALTERNAR ADMIN (promover/rebaixar) ────────────────────
+router.post('/users/:userId/toggle-admin', requireSuperAdmin, (req, res) => {
+  const { userId } = req.params;
+  const { isAdmin } = req.body;
+
+  const data = db.read();
+  const user = data.users.find(u => u.id === userId);
+
+  if (!user) {
+    return res.status(404).json({ error: 'Usuário não encontrado.' });
+  }
+
+  // Não pode alterar o próprio super admin
+  if (user.isSuperAdmin) {
+    return res.status(400).json({ error: 'Você não pode alterar o super administrador.' });
+  }
+
+  // Se for pra promover e já é admin, ou rebaixar e já não é, avisa
+  if (isAdmin && user.isAdmin) {
+    return res.status(400).json({ error: 'Este usuário já é administrador.' });
+  }
+  if (!isAdmin && !user.isAdmin) {
+    return res.status(400).json({ error: 'Este usuário não é administrador.' });
+  }
+
+  user.isAdmin = !!isAdmin;
+  db.write(data);
+
+  const action = isAdmin ? 'promovido' : 'rebaixado';
+  res.json({ ok: true, message: `Usuário ${action} com sucesso!`, isAdmin: user.isAdmin });
 });
 
 module.exports = router;

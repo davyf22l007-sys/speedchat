@@ -146,9 +146,21 @@
       </nav>
     </div>
 
+    <!-- Overlay pro sidebar mobile -->
+    <div id="admin-sidebar-overlay" class="admin-sidebar-overlay hidden" onclick="adminCloseSidebar()"></div>
+
     <div class="admin-main">
       <div class="admin-header">
-        <h1 class="admin-title" id="admin-title">Painel de Administração</h1>
+        <div class="admin-header-left">
+          <button class="admin-mobile-menu-btn hidden" id="admin-menu-btn" onclick="adminToggleSidebar()" title="Menu">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="3" y1="6" x2="21" y2="6"/>
+              <line x1="3" y1="12" x2="21" y2="12"/>
+              <line x1="3" y1="18" x2="21" y2="18"/>
+            </svg>
+          </button>
+          <h1 class="admin-title" id="admin-title">Painel de Administração</h1>
+        </div>
         <div class="admin-header-actions">
           <button class="admin-refresh-btn" onclick="adminLoadUsers()" title="Atualizar">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -268,6 +280,13 @@
                 <button class="admin-btn admin-btn-sm" onclick="adminEditPassword()">Alterar</button>
               </div>
               <div id="admin-edit-password-error" class="admin-error hidden"></div>
+            </div>
+
+            <div class="admin-modal-section hidden" id="admin-modal-admin-section">
+              <h3>Administração</h3>
+              <p class="admin-danger-text">Promova ou rebaixe este usuário como administrador.</p>
+              <button class="admin-btn admin-btn-sm admin-btn-admin" id="admin-toggle-admin-btn" onclick="adminToggleAdmin()">Tornar Admin</button>
+              <div id="admin-toggle-error" class="admin-error hidden"></div>
             </div>
 
             <div class="admin-modal-section admin-modal-section--danger">

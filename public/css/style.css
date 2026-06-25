@@ -2322,9 +2322,34 @@ button:focus, button:focus-visible { outline: none !important; box-shadow: none;
   border: 1px solid rgba(74, 85, 104, 0.15);
 }
 
+.admin-badge--superadmin {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  background: rgba(241, 196, 15, 0.15);
+  color: #b7950b;
+  border: 1px solid rgba(241, 196, 15, 0.35);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 20px;
+  letter-spacing: 0.3px;
+}
+
+[data-theme="dark"] .admin-badge--superadmin {
+  background: rgba(241, 196, 15, 0.12);
+  color: #f1c40f;
+  border-color: rgba(241, 196, 15, 0.30);
+}
+
 .admin-muted {
   color: var(--text-muted);
   font-size: 13px;
+}
+
+/* Acoes inline no mobile (dentro do td do usuario) - escondido no desktop */
+.admin-row-actions-mobile {
+  display: none;
 }
 
 .admin-btn {
@@ -2842,18 +2867,166 @@ button:focus, button:focus-visible { outline: none !important; box-shadow: none;
 }
 .admin-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
-/* Responsivo admin */
+/* ── Overlay do sidebar mobile ── */
+.admin-sidebar-overlay {
+  display: none;
+}
+
+/* ── Botao hamburger no header ── */
+.admin-header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* ── Responsivo admin ── */
 @media (max-width: 768px) {
-  .admin-sidebar { width: 60px; min-width: 60px; }
-  .admin-sidebar-header .admin-brand,
-  .admin-user-info span,
-  .admin-nav-item span { display: none; }
-  .admin-nav-item { justify-content: center; padding: 10px; }
-  .admin-header { padding: 12px 16px; }
-  .admin-tab-content { padding: 14px 16px; }
-  .admin-stats { flex-direction: column; }
+  /* Sidebar vira drawer lateral */
+  .admin-sidebar {
+    position: fixed;
+    top: 0;
+    left: -280px;
+    width: 260px;
+    min-width: 260px;
+    height: 100vh;
+    height: 100dvh;
+    z-index: 300;
+    transition: left .28s ease;
+    box-shadow: 4px 0 24px rgba(0,0,0,0.15);
+  }
+  .admin-sidebar.open {
+    left: 0;
+  }
+
+  .admin-sidebar-overlay {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 299;
+    background: rgba(0, 0, 0, 0.40);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    animation: fadeIn .2s ease;
+  }
+  .admin-sidebar-overlay.hidden {
+    display: none;
+  }
+
+  .admin-layout {
+    flex-direction: column;
+  }
+
+  .admin-main {
+    width: 100%;
+    overflow: hidden;
+  }
+
+  .admin-header {
+    padding: 12px 16px;
+  }
+
+  .admin-tab-content {
+    padding: 14px 12px;
+  }
+
+  .admin-stats {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .admin-stat-card {
+    padding: 12px 16px;
+  }
+
+  .admin-stat-num {
+    font-size: 22px;
+  }
+
+  /* Tabela horizontalmente scrollavel */
+  .admin-table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    border-radius: 10px;
+  }
+
+  .admin-table {
+    min-width: 600px;
+  }
+
+  .admin-table thead th,
+  .admin-table tbody td {
+    padding: 10px 12px;
+    font-size: 13px;
+  }
+
   .admin-table tbody td:nth-child(2),
-  .admin-table thead th:nth-child(2) { display: none; }
+  .admin-table thead th:nth-child(2) {
+    display: none;
+  }
+
+  /* Coluna de acoes da tabela: escondida no mobile */
+  .admin-actions-cell {
+    display: none !important;
+  }
+
+  /* Acoes mobile: aparecem abaixo do nome, dentro do primeiro td */
+  .admin-row-actions-mobile {
+    display: none;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid rgba(255, 255, 255, 0.25);
+  }
+
+  .admin-table tbody tr.expanded .admin-row-actions-mobile {
+    display: flex;
+  }
+
+  .admin-table tbody tr.expanded td:first-child {
+    padding-bottom: 12px;
+  }
+
+  .admin-table tbody tr.expanded td:nth-child(-n+4) {
+    border-bottom: none;
+  }
+
+  .admin-btn-sm {
+    padding: 8px 10px;
+    font-size: 12px;
+  }
+
+  /* Modal admin mais adaptado */
+  .admin-modal-card {
+    max-width: 95vw;
+    margin: 0 10px;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+
+  .admin-modal-section--danger {
+    padding: 12px;
+  }
+
+  .admin-input-group {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .admin-input-group input {
+    width: 100%;
+  }
+
+  .admin-input-group .admin-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  /* Nav do sidebar mais tocavel no mobile */
+  .admin-nav-item {
+    padding: 14px 12px;
+    font-size: 15px;
+  }
 }
 
 /* ═══════════════════════════════════════════════════════════

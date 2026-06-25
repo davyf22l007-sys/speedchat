@@ -23,6 +23,7 @@ function getInitialData() {
         password: adminHash,
         avatarColor: '#e74c3c',
         isAdmin: true,
+        isSuperAdmin: true,
         createdAt: new Date().toISOString()
       }
     ],
@@ -43,13 +44,21 @@ function getInitialData() {
 }
 
 function ensureAdmin(data) {
-  const exists = data.users.find(u => u.id === 'user_admin' || u.isAdmin === true);
-  if (exists) {
-    exists.isAdmin = true;
+  // Só o user com id 'user_admin' pode ser super admin
+  const superAdmin = data.users.find(u => u.id === 'user_admin');
+  if (superAdmin) {
+    superAdmin.isAdmin = true;
+    superAdmin.isSuperAdmin = true;
     const general = data.rooms.find(r => r.id === 'room_general');
-    if (general && !general.members.includes(exists.id)) {
-      general.members.push(exists.id);
+    if (general && !general.members.includes(superAdmin.id)) {
+      general.members.push(superAdmin.id);
     }
+    // Garante que nenhum outro usuario tenha isSuperAdmin
+    data.users.forEach(u => {
+      if (u.id !== 'user_admin') {
+        u.isSuperAdmin = false;
+      }
+    });
     return false;
   }
   const adminHash = bcrypt.hashSync(ADMIN_PASSWORD, 10);
@@ -60,6 +69,7 @@ function ensureAdmin(data) {
     password: adminHash,
     avatarColor: '#e74c3c',
     isAdmin: true,
+    isSuperAdmin: true,
     createdAt: new Date().toISOString()
   });
   const general = data.rooms.find(r => r.id === 'room_general');
