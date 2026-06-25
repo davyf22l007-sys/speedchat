@@ -51,7 +51,10 @@ router.get('/rooms', requireAuth, (req, res) => {
       }
     }
 
-    return { ...room, name: displayName, avatarColor: displayColor, avatarData: avatarData, lastMessage: last, unread: 0 };
+    // Inclui hasPassword (bool) sem expor a senha
+    const enrichedRoom = { ...room, name: displayName, avatarColor: displayColor, avatarData: avatarData, lastMessage: last, unread: 0 };
+    enrichedRoom.hasPassword = !!room.password;
+    return enrichedRoom;
   });
 
   res.json(enriched);
@@ -444,6 +447,52 @@ router.post('/rooms/group', requireAuth, (req, res) => {
     lastMessage: null,
     unread: 0
   });
+});
+
+// ── VERIFICAR SE GRUPO TEM SENHA (qualquer usuário autenticado) ──
+router.get('/rooms/:roomId/password-check', requireAuth, (req, res) => {
+  const data = db.read();
+  const room = data.rooms.find(r => r.id === req.params.roomId);
+  if (!room) return res.status(404).json({ error: 'Sala não encontrada.' });
+  if (room.isDM) return res.json({ hasPassword: false });
+  res.json({ hasPassword: !!room.password });
+});
+
+// ── ENTRAR EM GRUPO COM SENHA ────────────────────────────
+router.post('/rooms/:roomId/join', requireAuth, (req, res) => {
+  const { password } = req.body;
+
+  const data = db.read();
+  const room = data.rooms.find(r => r.id === req.params.roomId);
+
+  if (!room) {
+    return res.status(404).json({ error: 'Sala não encontrada.' });
+  }
+
+  if (room.isDM) {
+    return res.status(400).json({ error: 'Não pode entrar em conversas privadas.' });
+  }
+
+  // Se já é membro, verifica senha mesmo assim (se o grupo tiver senha)
+  if (room.members.includes(req.userId)) {
+    if (room.password && (!password || password.trim() !== room.password)) {
+      return res.status(403).json({ error: 'Senha incorreta.' });
+    }
+    return res.json({ ok: true, alreadyMember: true });
+  }
+
+  // Verifica senha pra quem não é membro
+  if (room.password) {
+    if (!password || password.trim() !== room.password) {
+      return res.status(403).json({ error: 'Senha incorreta.' });
+    }
+  }
+
+  // Adiciona como membro
+  room.members.push(req.userId);
+  db.write(data);
+
+  res.json({ ok: true, alreadyMember: false });
 });
 
 // ── EDITAR SALA (nome e avatar) — só admin ou criador ────

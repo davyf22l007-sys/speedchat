@@ -206,21 +206,13 @@
           <div class="admin-groups-desc">
             Grupos globais aparecem automaticamente para todos os usuários, inclusive novos cadastros.
           </div>
+          <button class="admin-btn admin-btn-sm" onclick="adminOpenCreateGroupModal()" style="flex-shrink:0">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Criar Grupo
+          </button>
         </div>
-        <div class="admin-table-wrap">
-          <table class="admin-table">
-            <thead>
-              <tr>
-                <th>Grupo</th>
-                <th>Membros</th>
-                <th>Global</th>
-                <th>Ações</th>
-              </tr>
-            </thead>
-            <tbody id="admin-groups-tbody">
-              <tr><td colspan="4" class="admin-loading">Carregando...</td></tr>
-            </tbody>
-          </table>
+        <div class="admin-groups-cards" id="admin-groups-container">
+          <div class="admin-loading-rooms">Carregando...</div>
         </div>
       </div>
 
@@ -738,6 +730,99 @@
 </div>
 
 <!-- ═══════════════════════════════════════════════════════
+     MODAL — CRIAR GRUPO (admin)
+═══════════════════════════════════════════════════════ -->
+<div id="admin-create-group-overlay" class="admin-modal-overlay hidden" onclick="if(event.target===this)adminCloseCreateGroupModal()">
+  <div class="admin-modal-card" style="max-width:440px">
+    <div class="admin-modal-header">
+      <h2>Criar Grupo</h2>
+      <button class="admin-modal-close" onclick="adminCloseCreateGroupModal()">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+    </div>
+    <div class="admin-modal-body" style="padding-top:6px">
+      <div class="admin-modal-section">
+        <h3>Nome do Grupo</h3>
+        <input type="text" id="admin-create-group-name" placeholder="Ex: Amigos do trabalho" maxlength="30" style="width:100%;background:rgba(255,255,255,0.35);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,0.50);border-radius:8px;padding:9px 12px;font-size:14px;color:var(--text-primary);outline:none" />
+      </div>
+
+      <div class="admin-modal-section">
+        <h3>Selecionar Membros</h3>
+        <div style="display:flex;align-items:center;gap:8px;background:rgba(255,255,255,0.42);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,0.70);border-radius:12px;padding:0 12px;min-height:40px;margin-bottom:8px">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#8696a0" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input type="text" id="admin-create-group-filter" placeholder="Filtrar usuários..." style="flex:1;background:none;border:none;outline:none;font-size:14px;color:var(--text-primary);padding:8px 0;min-width:0" />
+        </div>
+        <div id="admin-create-group-userlist" style="max-height:180px;overflow-y:auto;display:flex;flex-direction:column;gap:2px;padding:4px 0"></div>
+        <div id="admin-create-group-selected" style="font-size:12px;color:var(--text-muted);margin-top:4px">Nenhum membro selecionado</div>
+      </div>
+
+      <div class="admin-modal-section">
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <h3 style="margin:0">Grupo Global</h3>
+          <label class="toggle-switch" style="margin:0">
+            <input type="checkbox" id="admin-create-group-global" />
+            <span class="toggle-slider" style="width:40px;height:22px"></span>
+          </label>
+        </div>
+        <p style="font-size:12px;color:var(--text-muted);margin:2px 0 0">Aparece automaticamente para todos os usuários</p>
+      </div>
+
+      <div class="admin-modal-section">
+        <h3>Senha do Grupo <span style="font-weight:400;color:var(--text-muted);font-size:12px">(opcional)</span></h3>
+        <div class="password-wrap" style="width:100%">
+          <input type="password" id="admin-create-group-password" placeholder="Mínimo 3 caracteres" maxlength="20" style="width:100%;background:rgba(255,255,255,0.35);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,0.50);border-radius:8px;padding:9px 36px 9px 12px;font-size:14px;color:var(--text-primary);outline:none" />
+          <button type="button" class="eye-btn" onclick="toggleEye('admin-create-group-password', this)" tabindex="-1">
+            <svg class="eye-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8696a0" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+              <circle cx="12" cy="12" r="3"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <div id="admin-create-group-error" class="admin-error hidden"></div>
+      <button class="modal-btn-primary" id="admin-create-group-btn" style="margin-top:4px">Criar Grupo</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     MODAL — SENHA DO GRUPO
+═══════════════════════════════════════════════════════ -->
+<div id="password-modal-overlay" class="modal-overlay hidden">
+  <div class="modal-card" style="max-width:380px">
+    <div class="modal-header">
+      <h2 class="modal-title">Grupo Protegido</h2>
+      <button class="modal-close" id="password-modal-close">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#54656f" stroke-width="2.2" stroke-linecap="round">
+          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+    </div>
+    <div class="modal-profile" style="gap:8px">
+      <div style="font-size:48px;line-height:1">🔒</div>
+      <p class="modal-subtitle" id="password-modal-room-name" style="text-align:center;margin:0">Este grupo é protegido por senha</p>
+    </div>
+    <p style="font-size:13px;color:var(--text-muted);text-align:center;margin:-4px 0 4px">Digite a senha para entrar no grupo</p>
+    <div class="input-group">
+      <div class="password-wrap">
+        <input type="password" id="password-modal-input" placeholder="Senha do grupo" maxlength="20" />
+        <button type="button" class="eye-btn" onclick="toggleEye('password-modal-input', this)" tabindex="-1">
+          <svg class="eye-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8696a0" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+            <circle cx="12" cy="12" r="3"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+    <div id="password-modal-error" class="modal-error hidden" style="text-align:center"></div>
+    <button class="modal-btn-primary" id="password-modal-btn">Entrar no Grupo</button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
      MODAL — MEMBROS DO GRUPO
 ═══════════════════════════════════════════════════════ -->
 <div id="group-members-overlay" class="modal-overlay hidden">
@@ -760,6 +845,37 @@
     </div>
     <p class="modal-subtitle" id="group-members-count">0 participantes</p>
     <div class="group-members-list" id="group-members-list"></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     MODAL — GERENCIAR MEMBROS (admin)
+═══════════════════════════════════════════════════════ -->
+<div id="admin-members-overlay" class="admin-modal-overlay hidden" onclick="if(event.target===this)adminCloseMembersModal()">
+  <div class="admin-modal-card" style="max-width:420px">
+    <div class="admin-modal-header">
+      <h2 id="admin-members-title">Membros do Grupo</h2>
+      <button class="admin-modal-close" onclick="adminCloseMembersModal()">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+    </div>
+    <div class="admin-modal-body" style="padding-top:6px">
+      <p style="font-size:13px;color:var(--text-muted);margin-bottom:6px" id="admin-members-count">0 membro(s)</p>
+
+      <!-- Campo de busca pra adicionar membro -->
+      <div id="admin-add-member-wrap" class="hidden" style="margin-bottom:8px">
+        <div style="display:flex;align-items:center;gap:6px;background:rgba(255,255,255,0.42);border:1px solid rgba(255,255,255,0.50);border-radius:10px;padding:0 10px;min-height:38px">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#8696a0" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input type="text" id="admin-add-member-input" placeholder="Buscar usuário pra adicionar..." style="flex:1;background:none;border:none;outline:none;font-size:13px;color:var(--text-primary);padding:8px 0;min-width:0" />
+        </div>
+        <div id="admin-add-member-results" style="max-height:150px;overflow-y:auto;display:flex;flex-direction:column;gap:1px;margin-top:4px"></div>
+      </div>
+
+      <div id="admin-members-list" style="max-height:250px;overflow-y:auto;display:flex;flex-direction:column;gap:2px"></div>
+      <div id="admin-members-error" class="admin-error hidden"></div>
+    </div>
   </div>
 </div>
 
@@ -867,7 +983,7 @@
   </div>
 </div>
 
-<script src="/js/app.js?v=2"></script>
-<script src="/js/admin.js?v=2"></script>
+<script src="/js/app.js?v=5"></script>
+<script src="/js/admin.js?v=5"></script>
 </body>
 </html>

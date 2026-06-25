@@ -548,60 +548,239 @@ async function adminToggleAdmin() {
   }
 }
 
+// ── CRIAR GRUPO (admin) ─────────────────────────────────
+let adminCreateGroupUsers = [];
+let adminCreateGroupSelected = [];
+
+function adminOpenCreateGroupModal() {
+  adminCloseSidebar();
+  adminCreateGroupSelected = [];
+  document.getElementById('admin-create-group-name').value = '';
+  document.getElementById('admin-create-group-filter').value = '';
+  document.getElementById('admin-create-group-password').value = '';
+  document.getElementById('admin-create-group-global').checked = false;
+  document.getElementById('admin-create-group-error').classList.add('hidden');
+  document.getElementById('admin-create-group-overlay').classList.remove('hidden');
+  document.getElementById('admin-create-group-selected').textContent = 'Nenhum membro selecionado';
+  setTimeout(() => document.getElementById('admin-create-group-name').focus(), 80);
+
+  // Carrega usuarios
+  fetch(`${API}/admin/users`)
+    .then(r => r.json())
+    .then(users => {
+      adminCreateGroupUsers = users;
+      renderAdminCreateGroupUsers(users);
+    })
+    .catch(() => {});
+}
+
+function adminCloseCreateGroupModal() {
+  document.getElementById('admin-create-group-overlay').classList.add('hidden');
+  adminCreateGroupSelected = [];
+}
+
+function renderAdminCreateGroupUsers(list) {
+  const el = document.getElementById('admin-create-group-userlist');
+  el.innerHTML = '';
+  const filtered = list.filter(u => u.id !== adminCurrentUser?.id);
+  if (filtered.length === 0) {
+    el.innerHTML = '<div style="padding:16px;text-align:center;color:var(--text-muted);font-size:13px">Nenhum usuário encontrado.</div>';
+    return;
+  }
+  filtered.forEach(u => {
+    const item = document.createElement('div');
+    item.className = 'group-user-item' + (adminCreateGroupSelected.includes(u.id) ? ' selected' : '');
+    const avColor = u.avatarColor || '#666';
+    const avatarHtml = u.avatarData && u.avatarData.startsWith('data:image/')
+      ? `<div class="avatar" style="width:36px;height:36px;font-size:15px;background:transparent"><img src="${escapeHtml(u.avatarData)}" class="avatar-img" alt=""></div>`
+      : `<div class="avatar" style="width:36px;height:36px;font-size:15px;background:${avColor}">${u.username[0].toUpperCase()}</div>`;
+    item.innerHTML = `
+      ${avatarHtml}
+      <span class="group-user-name">${escapeHtml(u.username)}</span>
+      <div class="group-user-check">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="20 6 9 17 4 12"/>
+        </svg>
+      </div>`;
+    item.dataset.userId = u.id;
+    item.addEventListener('click', () => toggleAdminCreateGroupMember(u.id));
+    el.appendChild(item);
+  });
+}
+
+function toggleAdminCreateGroupMember(userId) {
+  const idx = adminCreateGroupSelected.indexOf(userId);
+  if (idx === -1) {
+    adminCreateGroupSelected.push(userId);
+  } else {
+    adminCreateGroupSelected.splice(idx, 1);
+  }
+  const item = document.querySelector(`#admin-create-group-userlist .group-user-item[data-user-id="${userId}"]`);
+  if (item) item.classList.toggle('selected');
+  const count = adminCreateGroupSelected.length;
+  document.getElementById('admin-create-group-selected').textContent = count > 0
+    ? `${count} membro(s) selecionado(s)`
+    : 'Nenhum membro selecionado';
+}
+
+document.getElementById('admin-create-group-filter').addEventListener('input', e => {
+  const q = e.target.value.trim().toLowerCase();
+  const filtered = q ? adminCreateGroupUsers.filter(u => u.username.toLowerCase().includes(q)) : adminCreateGroupUsers;
+  renderAdminCreateGroupUsers(filtered);
+});
+
+document.getElementById('admin-create-group-btn').addEventListener('click', adminCreateGroup);
+
+document.getElementById('admin-create-group-name').addEventListener('keydown', e => {
+  if (e.key === 'Enter') adminCreateGroup();
+});
+
+async function adminCreateGroup() {
+  const name = document.getElementById('admin-create-group-name').value.trim();
+  const errorEl = document.getElementById('admin-create-group-error');
+  errorEl.classList.add('hidden');
+
+  if (!name) {
+    errorEl.textContent = 'Digite um nome para o grupo.';
+    errorEl.classList.remove('hidden');
+    return;
+  }
+
+  if (adminCreateGroupSelected.length === 0) {
+    errorEl.textContent = 'Selecione pelo menos um membro.';
+    errorEl.classList.remove('hidden');
+    return;
+  }
+
+  const isGlobal = document.getElementById('admin-create-group-global').checked;
+  const password = document.getElementById('admin-create-group-password').value.trim();
+
+  if (password && password.length < 3) {
+    errorEl.textContent = 'A senha deve ter pelo menos 3 caracteres.';
+    errorEl.classList.remove('hidden');
+    return;
+  }
+
+  const btn = document.getElementById('admin-create-group-btn');
+  btn.textContent = 'Criando…';
+  btn.disabled = true;
+
+  try {
+    const res = await fetch(`${API}/admin/rooms`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name,
+        members: adminCreateGroupSelected,
+        isGlobal,
+        password: password || undefined
+      })
+    });
+
+    if (!res.ok) {
+      const err = await res.json();
+      errorEl.textContent = err.error || 'Erro ao criar grupo.';
+      errorEl.classList.remove('hidden');
+      return;
+    }
+
+    adminCloseCreateGroupModal();
+    showToast('Grupo criado com sucesso!');
+    adminLoadGroups();
+  } catch {
+    errorEl.textContent = 'Erro de conexão.';
+    errorEl.classList.remove('hidden');
+  } finally {
+    btn.textContent = 'Criar Grupo';
+    btn.disabled = false;
+  }
+}
+
 // ── ADMIN GROUPS (Grupos Globais) ─────────────────────────
 async function adminLoadGroups() {
-  const tbody = document.getElementById('admin-groups-tbody');
-  tbody.innerHTML = '<tr><td colspan="4" class="admin-loading">Carregando...</td></tr>';
+  const container = document.getElementById('admin-groups-container');
+  container.innerHTML = '<div class="admin-loading-rooms">Carregando...</div>';
 
   try {
     const res = await fetch(`${API}/admin/rooms?_t=${Date.now()}`);
     if (!res.ok) {
-      tbody.innerHTML = '<tr><td colspan="4" class="admin-loading" style="color:#e53935">Erro ao carregar</td></tr>';
+      container.innerHTML = '<div class="admin-loading-rooms" style="color:#e53935">Erro ao carregar</div>';
       return;
     }
     const rooms = await res.json();
 
     if (rooms.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="4" class="admin-loading">Nenhum grupo encontrado.</td></tr>';
+      container.innerHTML = '<div class="admin-loading-rooms">Nenhum grupo encontrado.</div>';
       return;
     }
 
-    tbody.innerHTML = rooms.map(r => {
+    // Pega info de senha pra cada grupo
+    const roomsWithPassword = await Promise.all(rooms.map(async r => {
+      try {
+        const res = await fetch(`${API}/admin/rooms/${r.id}/password?_t=${Date.now()}`);
+        if (res.ok) {
+          const data = await res.json();
+          r.hasPassword = data.hasPassword;
+        }
+      } catch {}
+      return r;
+    }));
+
+    container.innerHTML = roomsWithPassword.map(r => {
       const isGlobal = r.isGlobal;
+      const hasPassword = r.hasPassword || false;
+      const pwPlaceholder = hasPassword ? '••••••' : 'Senha';
+      const pwBtnLabel = hasPassword ? 'Alterar' : 'Add';
+      const removeBtn = hasPassword ? `<button class="admin-btn admin-btn-sm admin-btn-pw-remove" onclick="adminRemovePassword('${r.id}')" title="Remover senha">✕</button>` : '';
+      const lockIcon = hasPassword ? '<span style="font-size:16px;margin-left:4px">🔒</span>' : '';
       return `
-        <tr>
-          <td>
-            <div class="admin-user-cell">
-              <div class="admin-table-avatar" style="width:36px;height:36px;border-radius:50%;background:${r.isGlobal ? '#25d366' : '#666'};display:flex;align-items:center;justify-content:center;color:white;font-weight:600;font-size:14px;flex-shrink:0">
+        <div class="admin-group-card" data-room-id="${r.id}">
+          <div class="admin-group-card-header">
+            <div class="admin-group-card-info">
+              <div class="admin-group-card-avatar" style="background:${r.isGlobal ? '#25d366' : '#4a5568'}">
                 ${escapeHtml(r.name[0].toUpperCase())}
               </div>
-              <span class="admin-user-name">${escapeHtml(r.name)}</span>
+              <div>
+                <div class="admin-group-card-name">${escapeHtml(r.name)} ${lockIcon}</div>
+                <div class="admin-group-card-meta">${r.memberCount} membro(s) ${isGlobal ? '· Global' : ''}</div>
+              </div>
             </div>
-          </td>
-          <td>${r.memberCount}</td>
-          <td>
-            <label class="toggle-switch" style="margin:0">
-              <input type="checkbox" ${isGlobal ? 'checked' : ''} onchange="adminToggleGlobal('${r.id}', this.checked)" />
-              <span class="toggle-slider" style="width:40px;height:22px"></span>
-            </label>
-          </td>
-          <td class="admin-actions-cell">
-            <button class="admin-btn admin-btn-sm" onclick="adminAddAllUsers('${r.id}', '${escapeHtml(r.name)}')" title="Adicionar todos os usuários a este grupo">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/>
-                <circle cx="8.5" cy="7" r="4"/>
-                <line x1="20" y1="8" x2="20" y2="14"/>
-                <line x1="23" y1="11" x2="17" y2="11"/>
-              </svg>
-              Add todos
-            </button>
-          </td>
-        </tr>
+          </div>
+          <div class="admin-group-card-body">
+            <div class="admin-group-card-row">
+              <span class="admin-group-card-label">Grupo Global</span>
+              <label class="toggle-switch" style="margin:0">
+                <input type="checkbox" ${isGlobal ? 'checked' : ''} onchange="adminToggleGlobal('${r.id}', this.checked)" />
+                <span class="toggle-slider" style="width:40px;height:22px"></span>
+              </label>
+            </div>
+            <div class="admin-group-card-row">
+              <span class="admin-group-card-label">Senha do Grupo</span>
+              <div class="admin-group-card-pw">
+                <input type="text" class="admin-password-input" id="admin-pw-${r.id}" placeholder="${pwPlaceholder}" maxlength="20" />
+                <button class="admin-btn admin-btn-sm admin-btn-pw" onclick="adminSetPassword('${r.id}')">${pwBtnLabel}</button>
+                ${removeBtn}
+              </div>
+            </div>
+            <div style="display:flex;gap:6px;margin-top:2px">
+              <button class="admin-btn admin-btn-sm" onclick="adminOpenMembersModal('${r.id}','${escapeHtml(r.name)}')" style="flex:1;justify-content:center">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+                Membros
+              </button>
+              <button class="admin-btn admin-btn-sm" onclick="adminAddAllUsers('${r.id}','${escapeHtml(r.name)}')" style="flex:1;justify-content:center">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
+                Add todos
+              </button>
+            </div>
+            </div>
+          </div>
+        </div>
       `;
     }).join('');
+
   } catch (err) {
     console.error('adminLoadGroups erro:', err);
-    tbody.innerHTML = '<tr><td colspan="4" class="admin-loading" style="color:#e53935">Erro de conexão</td></tr>';
+    container.innerHTML = '<div class="admin-loading-rooms" style="color:#e53935">Erro de conexão</div>';
   }
 }
 
@@ -627,6 +806,239 @@ async function adminToggleGlobal(roomId, isGlobal) {
   } catch {
     showToast('Erro de conexão.');
     adminLoadGroups();
+  }
+}
+
+// ── DEFINIR SENHA NO GRUPO ───────────────────────────────
+async function adminSetPassword(roomId) {
+  const input = document.getElementById(`admin-pw-${roomId}`);
+  const password = input.value.trim();
+
+  if (!password || password.length < 3) {
+    showToast('A senha deve ter pelo menos 3 caracteres.');
+    return;
+  }
+
+  try {
+    const res = await fetch(`${API}/admin/rooms/${roomId}/password`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password })
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      showToast(err.error || 'Erro ao definir senha');
+      return;
+    }
+    showToast('Senha definida com sucesso!');
+    adminLoadGroups();
+  } catch {
+    showToast('Erro de conexão.');
+  }
+}
+
+// ── REMOVER SENHA DO GRUPO ────────────────────────────────
+async function adminRemovePassword(roomId) {
+  const ok = await showConfirm('Remover a senha deste grupo?');
+  if (!ok) return;
+
+  try {
+    const res = await fetch(`${API}/admin/rooms/${roomId}/password`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: '' })
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      showToast(err.error || 'Erro ao remover senha');
+      return;
+    }
+    showToast('Senha removida!');
+    adminLoadGroups();
+  } catch {
+    showToast('Erro de conexão.');
+  }
+}
+
+// ── GERENCIAR MEMBROS DO GRUPO ────────────────────────────
+let adminMembersRoomId = null;
+let adminMembersAllUsers = [];
+let adminMembersIds = [];
+
+async function adminOpenMembersModal(roomId, roomName) {
+  adminMembersRoomId = roomId;
+  document.getElementById('admin-members-title').textContent = `Membros: ${escapeHtml(roomName)}`;
+  document.getElementById('admin-members-count').textContent = 'Carregando...';
+  document.getElementById('admin-members-error').classList.add('hidden');
+  document.getElementById('admin-members-overlay').classList.remove('hidden');
+  document.getElementById('admin-members-list').innerHTML = '<div class="admin-loading-rooms">Carregando...</div>';
+  document.getElementById('admin-add-member-wrap').classList.add('hidden');
+  document.getElementById('admin-add-member-input').value = '';
+  document.getElementById('admin-add-member-results').innerHTML = '';
+  adminCloseSidebar();
+
+  // Carrega todos os usuarios pra busca
+  try {
+    const res = await fetch(`${API}/admin/users?_t=${Date.now()}`);
+    if (res.ok) adminMembersAllUsers = await res.json();
+  } catch {}
+
+  await adminLoadMembers(roomId);
+}
+
+function adminCloseMembersModal() {
+  document.getElementById('admin-members-overlay').classList.add('hidden');
+  adminMembersRoomId = null;
+  adminMembersAllUsers = [];
+  adminMembersIds = [];
+}
+
+async function adminLoadMembers(roomId) {
+  const el = document.getElementById('admin-members-list');
+  const addWrap = document.getElementById('admin-add-member-wrap');
+  try {
+    const res = await fetch(`${API}/admin/rooms/${roomId}/members?_t=${Date.now()}`);
+    if (!res.ok) {
+      el.innerHTML = '<div class="admin-loading-rooms" style="color:#e53935">Erro ao carregar membros</div>';
+      return;
+    }
+    const members = await res.json();
+    adminMembersIds = members.map(m => m.id);
+    document.getElementById('admin-members-count').textContent = `${members.length} membro(s)`;
+
+    if (members.length === 0) {
+      el.innerHTML = '<div class="admin-loading-rooms">Nenhum membro.</div>';
+    } else {
+      el.innerHTML = members.map(m => {
+        const avColor = m.avatarColor || '#666';
+        const hasAvatar = m.avatarData && m.avatarData.startsWith('data:image/');
+        const avatarHtml = hasAvatar
+          ? `<div class="avatar" style="width:36px;height:36px;font-size:15px;background:transparent"><img src="${escapeHtml(m.avatarData)}" class="avatar-img" alt=""></div>`
+          : `<div class="avatar" style="width:36px;height:36px;font-size:15px;background:${avColor}">${m.username[0].toUpperCase()}</div>`;
+        const isYou = m.id === adminCurrentUser?.id;
+        const isSuper = m.isSuperAdmin;
+        const label = isYou ? ' (vc)' : isSuper ? ' ⭐' : '';
+        const canRemove = !isSuper && !isYou;
+        return `
+          <div class="group-member-card" style="display:flex;align-items:center;gap:10px;padding:8px 6px;border-radius:8px">
+            ${avatarHtml}
+            <div style="flex:1;min-width:0">
+              <div style="font-size:14px;font-weight:600;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(m.username)}${label}</div>
+            </div>
+            ${canRemove ? `<button class="admin-btn admin-btn-sm admin-btn-danger" onclick="adminRemoveMember('${roomId}','${m.id}')" style="flex-shrink:0;padding:4px 8px;font-size:11px">Remover</button>` : ''}
+          </div>
+        `;
+      }).join('');
+    }
+
+    // Mostra campo de busca pra adicionar (se tiver usuarios fora do grupo)
+    const nonMembers = adminMembersAllUsers.filter(u => !adminMembersIds.includes(u.id) && u.id !== adminCurrentUser?.id);
+    if (nonMembers.length > 0) {
+      addWrap.classList.remove('hidden');
+      renderAddMemberResults(nonMembers, roomId);
+    } else {
+      addWrap.classList.add('hidden');
+    }
+  } catch {
+    el.innerHTML = '<div class="admin-loading-rooms" style="color:#e53935">Erro de conexão</div>';
+  }
+}
+
+function renderAddMemberResults(users, roomId) {
+  const el = document.getElementById('admin-add-member-results');
+  el.innerHTML = users.map(u => {
+    const avColor = u.avatarColor || '#666';
+    const hasAvatar = u.avatarData && u.avatarData.startsWith('data:image/');
+    const avatarHtml = hasAvatar
+      ? `<div class="avatar" style="width:32px;height:32px;font-size:13px;background:transparent"><img src="${escapeHtml(u.avatarData)}" class="avatar-img" alt=""></div>`
+      : `<div class="avatar" style="width:32px;height:32px;font-size:13px;background:${avColor}">${u.username[0].toUpperCase()}</div>`;
+    const safeName = u.username.replace(/'/g, "\\'");
+    return `
+      <div class="group-member-card" style="display:flex;align-items:center;gap:8px;padding:6px 4px;border-radius:6px;cursor:pointer" onclick="adminAddMember('${roomId}','${u.id}','${safeName}')">
+        ${avatarHtml}
+        <span style="flex:1;font-size:13px;font-weight:500;color:var(--text-primary);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(u.username)}</span>
+        <span style="font-size:11px;color:var(--green-teal);font-weight:600;flex-shrink:0">+Adicionar</span>
+      </div>
+    `;
+  }).join('');
+}
+
+document.getElementById('admin-add-member-input').addEventListener('input', e => {
+  const q = e.target.value.trim().toLowerCase();
+  if (!adminMembersRoomId) return;
+  // Filtra localmente sem fazer requisição
+  const nonMembers = adminMembersAllUsers.filter(u => {
+    if (u.id === adminCurrentUser?.id) return false;
+    if (adminMembersIds.includes(u.id)) return false;
+    if (q && !u.username.toLowerCase().includes(q)) return false;
+    return true;
+  });
+  renderAddMemberResults(nonMembers, adminMembersRoomId);
+});
+
+async function adminAddMember(roomId, userId, username) {
+  try {
+    const res = await fetch(`${API}/admin/rooms/${roomId}/members`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId })
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      showToast(err.error || 'Erro ao adicionar');
+      return;
+    }
+    showToast(`${username} adicionado ao grupo!`);
+    document.getElementById('admin-add-member-input').value = '';
+    adminLoadMembers(roomId);
+    adminLoadGroups();
+  } catch {
+    showToast('Erro de conexão.');
+  }
+}
+
+async function adminRemoveMember(roomId, userId) {
+  // Pega o nome do usuario da lista carregada
+  const user = adminMembersAllUsers.find(u => u.id === userId);
+  const name = user ? user.username : 'usuário';
+  const ok = await showConfirm(`Remover ${name} do grupo?`);
+  if (!ok) return;
+
+  try {
+    const res = await fetch(`${API}/admin/rooms/${roomId}/members/${userId}`, {
+      method: 'DELETE'
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      showToast(err.error || 'Erro ao remover membro');
+      return;
+    }
+    showToast(`${name} removido do grupo!`);
+    adminLoadMembers(roomId);
+    adminLoadGroups();
+  } catch {
+    showToast('Erro de conexão.');
+  }
+}
+
+async function adminRemoveMember(roomId, userId, username) {
+  const ok = await showConfirm(`Remover ${escapeHtml(username)} do grupo?`);
+  if (!ok) return;
+
+  try {
+    const res = await fetch(`${API}/admin/rooms/${roomId}/members/${userId}`, {
+      method: 'DELETE'
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      showToast(err.error || 'Erro ao remover membro');
+      return;
+    }
+    showToast(`${escapeHtml(username)} removido do grupo!`);
+    adminLoadMembers(roomId);
+    adminLoadGroups();
+  } catch {
+    showToast('Erro de conexão.');
   }
 }
 

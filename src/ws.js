@@ -302,4 +302,8 @@ function broadcastGroupDeleted(roomId, memberIds) {
   }
 }
 
-module.exports = { setupWebSocket, broadcastAvatarUpdate, broadcastGroupDeleted };
+function broadcastPasswordUpdate(roomId) {
+  broadcastToRoom(roomId, { type: 'password_changed', roomId });
+}
+
+module.exports = { setupWebSocket, broadcastAvatarUpdate, broadcastGroupDeleted, broadcastPasswordUpdate };

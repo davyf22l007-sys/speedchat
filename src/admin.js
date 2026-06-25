@@ -1,6 +1,7 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const db = require('./db');
+const { broadcastPasswordUpdate } = require('./ws');
 
 const router = express.Router();
 
@@ -289,6 +290,205 @@ router.put('/rooms/:roomId/global', requireAdmin, (req, res) => {
   db.write(data);
 
   res.json({ ok: true, isGlobal: room.isGlobal, added });
+});
+
+// ── CRIAR GRUPO (admin) ─────────────────────────────────
+router.post('/rooms', requireAdmin, (req, res) => {
+  const { name, members, isGlobal, password } = req.body;
+
+  if (!name || !name.trim()) {
+    return res.status(400).json({ error: 'Nome do grupo é obrigatório.' });
+  }
+
+  const trimmedName = name.trim();
+  if (trimmedName.length > 30) {
+    return res.status(400).json({ error: 'O nome deve ter no máximo 30 caracteres.' });
+  }
+
+  // Garante que o admin criador ta na lista
+  if (!members.includes(req.userId)) {
+    members.push(req.userId);
+  }
+
+  if (!members || !Array.isArray(members) || members.length === 0) {
+    return res.status(400).json({ error: 'Selecione pelo menos um membro.' });
+  }
+
+  const data = db.read();
+
+  // Verifica se todos os membros existem
+  const allExist = members.every(id => data.users.find(u => u.id === id));
+  if (!allExist) {
+    return res.status(400).json({ error: 'Um ou mais usuários não existem.' });
+  }
+
+  const { v4: uuidv4 } = require('uuid');
+
+  const newRoom = {
+    id: 'room_' + uuidv4().split('-')[0],
+    name: trimmedName,
+    isDM: false,
+    members,
+    avatarColor: '#4a5568',
+    avatarData: null,
+    createdBy: req.userId,
+    createdAt: new Date().toISOString(),
+    isGlobal: !!isGlobal
+  };
+
+  // Se tiver senha, adiciona
+  if (password && typeof password === 'string' && password.trim().length >= 3) {
+    newRoom.password = password.trim();
+  }
+
+  data.rooms.push(newRoom);
+  db.write(data);
+
+  res.status(201).json({
+    id: newRoom.id,
+    name: newRoom.name,
+    memberCount: newRoom.members.length,
+    isGlobal: newRoom.isGlobal,
+    hasPassword: !!newRoom.password,
+    createdAt: newRoom.createdAt
+  });
+});
+
+// ── VERIFICAR SE GRUPO TEM SENHA (sem expor a senha) ────
+router.get('/rooms/:roomId/password', requireAdmin, (req, res) => {
+  const data = db.read();
+  const room = data.rooms.find(r => r.id === req.params.roomId);
+
+  if (!room) {
+    return res.status(404).json({ error: 'Sala não encontrada.' });
+  }
+
+  res.json({ hasPassword: !!room.password });
+});
+
+// ── DEFINIR/REMOVER SENHA DE UM GRUPO ───────────────────
+router.put('/rooms/:roomId/password', requireAdmin, (req, res) => {
+  const data = db.read();
+  const room = data.rooms.find(r => r.id === req.params.roomId);
+
+  if (!room) {
+    return res.status(404).json({ error: 'Sala não encontrada.' });
+  }
+
+  if (room.isDM) {
+    return res.status(400).json({ error: 'Não pode definir senha em conversas privadas.' });
+  }
+
+  const { password } = req.body;
+
+  if (password && typeof password === 'string' && password.trim().length > 0) {
+    if (password.trim().length < 3) {
+      return res.status(400).json({ error: 'A senha deve ter pelo menos 3 caracteres.' });
+    }
+    room.password = password.trim();
+    db.write(data);
+    broadcastPasswordUpdate(room.id);
+    return res.json({ ok: true, hasPassword: true, message: 'Senha definida com sucesso!' });
+  } else {
+    // Remove a senha se existir
+    if (room.password) {
+      delete room.password;
+      db.write(data);
+      broadcastPasswordUpdate(room.id);
+      return res.json({ ok: true, hasPassword: false, message: 'Senha removida com sucesso!' });
+    }
+    return res.json({ ok: true, hasPassword: false, message: 'O grupo já não tinha senha.' });
+  }
+});
+
+// ── ADICIONAR MEMBRO A UM GRUPO ───────────────────────────
+router.post('/rooms/:roomId/members', requireAdmin, (req, res) => {
+  const { userId } = req.body;
+  const data = db.read();
+  const room = data.rooms.find(r => r.id === req.params.roomId);
+
+  if (!room) {
+    return res.status(404).json({ error: 'Sala não encontrada.' });
+  }
+
+  if (room.isDM) {
+    return res.status(400).json({ error: 'Não pode adicionar membros em conversas privadas.' });
+  }
+
+  if (!userId) {
+    return res.status(400).json({ error: 'userId é obrigatório.' });
+  }
+
+  const user = data.users.find(u => u.id === userId);
+  if (!user) {
+    return res.status(404).json({ error: 'Usuário não encontrado.' });
+  }
+
+  if (room.members.includes(userId)) {
+    return res.status(400).json({ error: 'Usuário já é membro deste grupo.' });
+  }
+
+  room.members.push(userId);
+  db.write(data);
+
+  res.json({ ok: true, message: `${user.username} adicionado ao grupo!` });
+});
+
+// ── LISTAR MEMBROS DE UM GRUPO (com dados) ────────────────
+router.get('/rooms/:roomId/members', requireAdmin, (req, res) => {
+  const data = db.read();
+  const room = data.rooms.find(r => r.id === req.params.roomId);
+
+  if (!room) {
+    return res.status(404).json({ error: 'Sala não encontrada.' });
+  }
+
+  const members = (room.members || []).map(id => {
+    const user = data.users.find(u => u.id === id);
+    return user
+      ? {
+          id: user.id,
+          username: user.username,
+          avatarColor: user.avatarColor,
+          avatarData: user.avatarData || null,
+          isAdmin: user.isAdmin || false,
+          isSuperAdmin: user.isSuperAdmin || false
+        }
+      : { id, username: 'Desconhecido', avatarColor: '#666', avatarData: null, isAdmin: false, isSuperAdmin: false };
+  });
+
+  res.json(members);
+});
+
+// ── REMOVER MEMBRO DE UM GRUPO ────────────────────────────
+router.delete('/rooms/:roomId/members/:userId', requireAdmin, (req, res) => {
+  const { roomId, userId } = req.params;
+  const data = db.read();
+  const room = data.rooms.find(r => r.id === roomId);
+
+  if (!room) {
+    return res.status(404).json({ error: 'Sala não encontrada.' });
+  }
+
+  if (room.isDM) {
+    return res.status(400).json({ error: 'Não pode remover membros de conversas privadas.' });
+  }
+
+  // Protege super admin
+  const targetUser = data.users.find(u => u.id === userId);
+  if (targetUser && targetUser.isSuperAdmin) {
+    return res.status(400).json({ error: 'Não pode remover o super administrador do grupo.' });
+  }
+
+  const idx = room.members.indexOf(userId);
+  if (idx === -1) {
+    return res.status(404).json({ error: 'Usuário não é membro deste grupo.' });
+  }
+
+  room.members.splice(idx, 1);
+  db.write(data);
+
+  res.json({ ok: true, message: 'Membro removido do grupo.' });
 });
 
 // ── ADICIONAR TODOS OS USUÁRIOS EXISTENTES A UM GRUPO ───

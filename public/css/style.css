@@ -2553,6 +2553,158 @@ button:focus, button:focus-visible { outline: none !important; box-shadow: none;
 }
 .admin-error.hidden { display: none; }
 
+/* ── ADMIN GROUP CARDS ── */
+.admin-groups-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.admin-group-card {
+  background: rgba(255, 255, 255, 0.35);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.50);
+  border-radius: 14px;
+  overflow: hidden;
+  transition: background .12s;
+}
+
+.admin-group-card:hover {
+  background: rgba(255, 255, 255, 0.45);
+}
+
+.admin-group-card-header {
+  padding: 14px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.20);
+}
+
+.admin-group-card-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.admin-group-card-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-weight: 600;
+  font-size: 16px;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+}
+
+.admin-group-card-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.admin-group-card-meta {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.admin-group-card-body {
+  padding: 12px 16px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.admin-group-card-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.admin-group-card-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.admin-group-card-pw {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+[data-theme="dark"] .admin-group-card {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+[data-theme="dark"] .admin-group-card:hover {
+  background: rgba(255, 255, 255, 0.10);
+}
+
+[data-theme="dark"] .admin-group-card-header {
+  border-bottom-color: rgba(255, 255, 255, 0.06);
+}
+
+.admin-password-input {
+  width: 90px;
+  padding: 5px 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.35);
+  font-size: 12px;
+  color: var(--text-primary);
+  outline: none;
+  transition: border-color .15s;
+}
+.admin-password-input:focus {
+  border-color: #4a5568;
+}
+.admin-password-input::placeholder {
+  color: #b0b8c0;
+}
+
+.admin-btn-pw {
+  background: #4a5568;
+  color: #fff;
+  white-space: nowrap;
+}
+.admin-btn-pw:hover {
+  background: #3a4455;
+}
+
+.admin-btn-pw-remove {
+  background: rgba(229, 57, 53, 0.12);
+  color: #e53935;
+  border: 1px solid rgba(229, 57, 53, 0.25);
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  border-radius: 6px;
+}
+.admin-btn-pw-remove:hover {
+  background: rgba(229, 57, 53, 0.20);
+}
+
+[data-theme="dark"] .admin-password-input {
+  background: rgba(40, 50, 60, 0.35);
+  border-color: rgba(255, 255, 255, 0.10);
+  color: var(--text-primary);
+}
+[data-theme="dark"] .admin-password-input:focus {
+  border-color: #2a8c5c;
+}
+
 /* Botões de ação na tabela */
 .admin-actions-cell {
   display: flex;

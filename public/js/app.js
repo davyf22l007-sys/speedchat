@@ -16,6 +16,81 @@ let editingMsgId = null;
 let contextMsgId = null;
 let searchResults = [];
 let searchIndex = -1;
+// ── JOIN GROUP WITH PASSWORD ────────────────────────────────
+let passwordJoinRoomId = null;
+
+function openPasswordModal(roomId, roomName) {
+  passwordJoinRoomId = roomId;
+  document.getElementById('password-modal-room-name').textContent = `🔒 ${escapeHtml(roomName)}`;
+  document.getElementById('password-modal-input').value = '';
+  document.getElementById('password-modal-error').classList.add('hidden');
+  document.getElementById('password-modal-overlay').classList.remove('hidden');
+  setTimeout(() => document.getElementById('password-modal-input').focus(), 80);
+}
+
+function closePasswordModal() {
+  document.getElementById('password-modal-overlay').classList.add('hidden');
+  passwordJoinRoomId = null;
+}
+
+document.getElementById('password-modal-overlay').addEventListener('click', e => {
+  if (e.target === document.getElementById('password-modal-overlay')) closePasswordModal();
+});
+document.getElementById('password-modal-close').addEventListener('click', closePasswordModal);
+
+document.getElementById('password-modal-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('password-modal-btn').click();
+});
+
+document.getElementById('password-modal-btn').addEventListener('click', async () => {
+  const roomId = passwordJoinRoomId;
+  if (!roomId) return;
+
+  const password = document.getElementById('password-modal-input').value.trim();
+  const errorEl = document.getElementById('password-modal-error');
+  errorEl.classList.add('hidden');
+
+  if (!password) {
+    errorEl.textContent = 'Digite a senha do grupo.';
+    errorEl.classList.remove('hidden');
+    return;
+  }
+
+  const btn = document.getElementById('password-modal-btn');
+  btn.textContent = 'Entrando…';
+  btn.disabled = true;
+
+  try {
+    const res = await fetch(`${API}/api/rooms/${roomId}/join`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password })
+    });
+
+    if (!res.ok) {
+      const err = await res.json();
+      errorEl.textContent = err.error || 'Senha incorreta.';
+      errorEl.classList.remove('hidden');
+      btn.textContent = 'Entrar no Grupo';
+      btn.disabled = false;
+      return;
+    }
+
+    // Entrou! Recarrega as salas e abre o grupo
+    closePasswordModal();
+    await loadRooms();
+    const room = rooms.find(r => r.id === roomId);
+    if (room) openRoom(room);
+    showToast('Você entrou no grupo!');
+  } catch {
+    errorEl.textContent = 'Erro de conexão.';
+    errorEl.classList.remove('hidden');
+  } finally {
+    btn.textContent = 'Entrar no Grupo';
+    btn.disabled = false;
+  }
+});
+
 const unreadCounts = {};
 
 const $ = id => document.getElementById(id);
@@ -302,15 +377,18 @@ function renderRoomList(list) {
     const avatarHtml = room.avatarData && room.avatarData.startsWith('data:image/')
       ? `<div class="avatar" style="background:transparent"><img src="${escapeHtml(room.avatarData)}" class="avatar-img" alt=""></div>`
       : `<div class="avatar" style="background:${color}">${room.name[0].toUpperCase()}</div>`;
+    const isProtected = room.hasPassword;
+    const lockHtml = isProtected ? '<span style="font-size:13px;margin-left:4px">🔒</span>' : '';
+    
     item.innerHTML = `
       ${avatarHtml}
       <div class="chat-item-info">
         <div class="chat-item-top">
-          <span class="chat-item-name">${escapeHtml(room.name)}</span>
+          <span class="chat-item-name">${escapeHtml(room.name)}${lockHtml}</span>
           <span class="chat-item-time">${time}</span>
         </div>
         <div class="chat-item-bottom">
-          <div class="chat-item-preview">${escapeHtml(preview.substring(0, 60))}</div>
+          <div class="chat-item-preview">${isProtected ? '🔒 Grupo protegido por senha' : escapeHtml(preview.substring(0, 60))}</div>
           ${badgeHtml}
         </div>
       </div>`;
@@ -320,6 +398,21 @@ function renderRoomList(list) {
 }
 
 async function openRoom(room) {
+  // SEMPRE verifica a senha atualizada no backend (não confia no cache)
+  try {
+    const pwRes = await fetch(`${API}/api/rooms/${room.id}/password-check?_t=${Date.now()}`);
+    if (pwRes.ok) {
+      const pwData = await pwRes.json();
+      room.hasPassword = pwData.hasPassword;
+    }
+  } catch {}
+
+  // Se o grupo tem senha, pede a senha pra todo mundo (inclusive membros)
+  if (room.hasPassword) {
+    openPasswordModal(room.id, room.name);
+    return;
+  }
+
   currentRoomId = room.id;
   cancelReply();
   cancelEdit();
@@ -714,6 +807,9 @@ function connectWebSocket() {
           break;
         case 'group_deleted':
           handleGroupDeleted(msg.roomId);
+          break;
+        case 'password_changed':
+          loadRooms();
           break;
       }
     } catch (err) {
@@ -1350,6 +1446,7 @@ document.addEventListener('keydown', e => {
     closeGroupModal();
     closeEditGroupModal();
     closeGroupMembersModal();
+    closePasswordModal();
     closeConfirm(false);
     closeEmojiPicker();
     if (editingMsgId) cancelEdit();
