@@ -113,7 +113,7 @@ function handleMessage(clientId, msg) {
   // Para o typing indicator quando envia
   stopTyping(clientId, roomId);
 
-  broadcast({ type: 'new_message', message }, clientId);
+  broadcast({ type: 'new_message', message });
 }
 
 function handleTyping(clientId, msg) {
