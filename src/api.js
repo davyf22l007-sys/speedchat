@@ -1,7 +1,7 @@
 const express = require('express');
 const { v4: uuidv4 } = require('uuid');
 const db = require('./db');
-const { broadcastAvatarUpdate } = require('./ws');
+const { broadcastAvatarUpdate, broadcastGroupDeleted } = require('./ws');
 
 const router = express.Router();
 
@@ -68,19 +68,30 @@ router.get('/rooms/:roomId/messages', requireAuth, (req, res) => {
   const clearedAt = data.clearedAt || {};
   const cutoff = clearedAt[`${req.userId}:${req.params.roomId}`] || null;
 
-  const messages = data.messages.filter(m => {
+  let messages = data.messages.filter(m => {
     if (m.roomId !== req.params.roomId) return false;
     if (cutoff && m.timestamp <= cutoff) return false;
     return true;
   });
 
+  // Paginação: as últimas mensagens primeiro
+  const limit = Math.min(parseInt(req.query.limit) || 50, 200);
+  const offset = parseInt(req.query.offset) || 0;
+  const total = messages.length;
+  const hasMore = offset + limit < total;
+
+  // Pega do final pra trás (mais recentes primeiro)
+  const startIndex = Math.max(0, total - offset - limit);
+  const endIndex = total - offset;
+  const page = messages.slice(startIndex, endIndex);
+
   // Enriquece cada mensagem com avatarData atual do autor
-  const enriched = messages.map(m => {
+  const enriched = page.map(m => {
     const author = data.users.find(u => u.id === m.authorId);
     return { ...m, authorAvatarData: author?.avatarData || null };
   });
 
-  res.json(enriched);
+  res.json({ messages: enriched, total, hasMore, offset, limit });
 });
 
 router.post('/rooms/:roomId/messages', requireAuth, (req, res) => {
@@ -141,7 +152,7 @@ router.get('/users/search', requireAuth, (req, res) => {
   if (!found) return res.status(404).json({ error: 'Usuário não encontrado.' });
   if (found.id === req.userId) return res.status(400).json({ error: 'Você não pode iniciar uma conversa consigo mesmo.' });
 
-  res.json({ id: found.id, username: found.username, avatarColor: found.avatarColor, avatarData: found.avatarData || null });
+  res.json({ id: found.id, username: found.username, avatarColor: found.avatarColor, avatarData: found.avatarData || null, bio: found.bio || '' });
 });
 
 // ── CRIAR OU RECUPERAR CONVERSA PRIVADA (DM) ─────────────
@@ -321,9 +332,24 @@ router.put('/profile', requireAuth, (req, res) => {
     avatarChanged = true;
   }
 
+  // Salva recado (bio)
+  if (req.body.bio !== undefined) {
+    const bio = String(req.body.bio).trim();
+    if (bio.length > 150) {
+      return res.status(400).json({ error: 'O recado deve ter no máximo 150 caracteres.' });
+    }
+    user.bio = bio;
+  }
+
   db.write(data);
 
-  res.json({ id: user.id, username: user.username, avatarColor: user.avatarColor, avatarData: user.avatarData });
+  res.json({
+    id: user.id,
+    username: user.username,
+    avatarColor: user.avatarColor,
+    avatarData: user.avatarData,
+    bio: user.bio || ''
+  });
 
   // Avisa geral via websocket que o perfil mudou
   if (avatarChanged) {
@@ -359,7 +385,8 @@ router.get('/users', requireAuth, (req, res) => {
     id: u.id,
     username: u.username,
     avatarColor: u.avatarColor,
-    avatarData: u.avatarData || null
+    avatarData: u.avatarData || null,
+    bio: u.bio || ''
   }));
   res.json(users);
 });
@@ -404,7 +431,8 @@ router.post('/rooms/group', requireAuth, (req, res) => {
     avatarColor: '#4a5568',
     avatarData: null,
     createdBy: req.userId,
-    createdAt: new Date().toISOString()
+    createdAt: new Date().toISOString(),
+    isGlobal: false
   };
 
   data.rooms.push(newRoom);
@@ -499,7 +527,5 @@ router.delete('/rooms/:roomId', requireAuth, (req, res) => {
 
   res.json({ ok: true });
 });
-
-const { broadcastGroupDeleted } = require('./ws');
 
 module.exports = { router, requireAuth };

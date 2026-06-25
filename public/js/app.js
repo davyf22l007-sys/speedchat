@@ -58,6 +58,60 @@ function playNotificationSound() {
   } catch {}
 }
 
+// ── NOTIFICAÇÃO NO TÍTULO DA ABA ─────────────────────────
+let pageFocused = true;
+
+function updateTitle() {
+  const totalUnread = Object.values(unreadCounts).reduce((a, b) => a + b, 0);
+  if (totalUnread > 0 && !pageFocused) {
+    document.title = `(${totalUnread}) SpeedChat`;
+  } else {
+    document.title = 'SpeedChat';
+  }
+}
+
+window.addEventListener('focus', () => {
+  pageFocused = true;
+  updateTitle();
+});
+window.addEventListener('blur', () => {
+  pageFocused = false;
+  updateTitle();
+});
+
+// ── NOTIFICAÇÃO DESKTOP (Notification API) ───────────────
+let notifPermissionAsked = false;
+
+function askNotifPermission() {
+  if (notifPermissionAsked) return;
+  notifPermissionAsked = true;
+  if (!('Notification' in window)) return;
+  if (Notification.permission === 'granted' || Notification.permission === 'denied') return;
+  Notification.requestPermission();
+}
+
+function sendDesktopNotif(title, body, roomId) {
+  if (!('Notification' in window)) return;
+  if (Notification.permission !== 'granted') return;
+  if (pageFocused) return;
+  try {
+    const notif = new Notification(title, {
+      body: body,
+      icon: '/favicon.svg',
+      tag: roomId || 'speedchat',
+      silent: true
+    });
+    notif.onclick = () => {
+      window.focus();
+      if (roomId) {
+        const room = rooms.find(r => r.id === roomId);
+        if (room) openRoom(room);
+      }
+      notif.close();
+    };
+  } catch {}
+}
+
 // ── TIMESTAMP RELATIVO ─────────────────────────────────────
 function formatRelative(iso) {
   const d = new Date(iso);
@@ -118,7 +172,10 @@ async function prefetchAllRooms() {
     const fetches = allRooms.map(async room => {
       try {
         const r = await fetch(`/api/rooms/${room.id}/messages`);
-        if (r.ok) messagesCache[room.id] = await r.json();
+        if (r.ok) {
+          const data = await r.json();
+          messagesCache[room.id] = Array.isArray(data) ? data : (data.messages || []);
+        }
       } catch {}
     });
     await Promise.all(fetches);
@@ -276,6 +333,7 @@ async function openRoom(room) {
   cancelReply();
   cancelEdit();
   unreadCounts[room.id] = 0;
+  updateTitle();
   const badge = document.querySelector(`.chat-item[data-room-id="${room.id}"] .unread-badge`);
   if (badge) badge.remove();
   document.querySelectorAll('.chat-item').forEach(el => {
@@ -290,8 +348,10 @@ async function openRoom(room) {
   renderAvatar(av, room.name, color, room.avatarData);
   $('chat-name').textContent = room.name;
 
-  if (messagesCache[room.id]) {
-    renderMessages(messagesCache[room.id]);
+  // Tenta usar cache primeiro
+  const cached = messagesCache[room.id];
+  if (cached && cached.length > 0) {
+    renderMessages(cached);
   } else {
     $('messages-container').innerHTML = '<div class="admin-loading" style="padding:40px;text-align:center;color:var(--text-muted)">Carregando...</div>';
   }
@@ -299,9 +359,10 @@ async function openRoom(room) {
   try {
     const res = await fetch(`${API}/api/rooms/${room.id}/messages`);
     if (res.ok) {
-      const messages = await res.json();
-      messagesCache[room.id] = messages;
-      if (currentRoomId === room.id) renderMessages(messages);
+      const data = await res.json();
+      const msgs = Array.isArray(data) ? data : (data.messages || []);
+      messagesCache[room.id] = msgs;
+      if (currentRoomId === room.id) renderMessages(msgs);
     }
   } catch {}
 }
@@ -704,19 +765,28 @@ async function handleNewMessage(message) {
   // Só atualiza o ID da temporária pro ID real do servidor
   if (message.authorId === currentUser.id) {
     const tmpRows = document.querySelectorAll(`.message-row[data-msg-id^="tmp_"]`);
+    let found = false;
     for (const row of tmpRows) {
       if (row.classList.contains('out')) {
-        // Confere se o conteúdo bate (ignorando diferenças de formatação)
         const bubbleText = row.querySelector('.bubble')?.textContent?.trim();
         const msgText = message.content?.trim();
         if (bubbleText === msgText) {
-          // Atualiza o ID da mensagem temporária pro ID real
           row.dataset.msgId = message.id;
-          return; // Não adiciona de novo!
+          found = true;
+          break;
         }
       }
     }
+    if (found) {
+      // Remove tmp leftovers (se houver) antes de sair
+      document.querySelectorAll(`.message-row[data-msg-id^="tmp_"]`).forEach(el => el.remove());
+      return;
+    }
   }
+
+  // Se a sala atual já tem essa mensagem (pelo ID real), ignora
+  const existingRow = document.querySelector(`.message-row[data-msg-id="${message.id}"]`);
+  if (existingRow) return;
 
   // Se a sala não existe na sidebar, recarrega a lista primeiro
   const roomItem = document.querySelector(`.chat-item[data-room-id="${message.roomId}"]`);
@@ -732,8 +802,14 @@ async function handleNewMessage(message) {
     }
   } else {
     unreadCounts[message.roomId] = (unreadCounts[message.roomId] || 0) + 1;
+    askNotifPermission();
+    const room = rooms.find(r => r.id === message.roomId);
+    const roomName = room ? room.name : 'Nova mensagem';
+    const preview = message.content?.substring(0, 60) || (message.type === 'image' ? '📷 Imagem' : message.type === 'file' ? '📄 Documento' : '');
+    sendDesktopNotif(message.authorName || roomName, preview, message.roomId);
   }
   updateRoomPreview(message);
+  updateTitle();
 }
 
 function handleMessageDeleted(messageId, roomId) {

@@ -26,6 +26,10 @@ function adminSwitchTab(tab) {
   document.querySelectorAll('.admin-nav-item').forEach(el => el.classList.remove('active'));
   document.getElementById(`admin-tab-${tab}`).classList.add('active');
   document.getElementById(`admin-nav-${tab}`).classList.add('active');
+  // Se for a tab de grupos, carrega os grupos
+  if (tab === 'groups') {
+    adminLoadGroups();
+  }
 }
 
 function adminGoBack() {
@@ -98,7 +102,7 @@ async function adminLoadUserRooms(userId) {
     }
 
     container.innerHTML = rooms.map(room => `
-      <div class="admin-room-card" data-room-id="${room.id}" data-room-name="${escapeHtml(room.name)}" onclick="adminOpenRoom('${room.id}', '${escapeHtml(room.name).replace(/'/g, "\\'")}')">
+      <div class="admin-room-card" data-room-id="${room.id}" data-room-name="${escapeHtml(room.name)}">
         <div class="admin-room-avatar">${room.name[0].toUpperCase()}</div>
         <div class="admin-room-info">
           <div class="admin-room-name">${escapeHtml(room.name)}</div>
@@ -424,3 +428,120 @@ async function adminDeleteUser() {
 
 // ── TOAST (usa a função do app.js) ──────────────────────────
 // showToast e escapeHtml já estão definidas em app.js
+
+// ── ADMIN GROUPS (Grupos Globais) ─────────────────────────
+async function adminLoadGroups() {
+  const tbody = document.getElementById('admin-groups-tbody');
+  tbody.innerHTML = '<tr><td colspan="4" class="admin-loading">Carregando...</td></tr>';
+
+  try {
+    const res = await fetch(`${API}/admin/rooms?_t=${Date.now()}`);
+    if (!res.ok) {
+      tbody.innerHTML = '<tr><td colspan="4" class="admin-loading" style="color:#e53935">Erro ao carregar</td></tr>';
+      return;
+    }
+    const rooms = await res.json();
+
+    if (rooms.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="4" class="admin-loading">Nenhum grupo encontrado.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = rooms.map(r => {
+      const isGlobal = r.isGlobal;
+      return `
+        <tr>
+          <td>
+            <div class="admin-user-cell">
+              <div class="admin-table-avatar" style="width:36px;height:36px;border-radius:50%;background:${r.isGlobal ? '#25d366' : '#666'};display:flex;align-items:center;justify-content:center;color:white;font-weight:600;font-size:14px;flex-shrink:0">
+                ${escapeHtml(r.name[0].toUpperCase())}
+              </div>
+              <span class="admin-user-name">${escapeHtml(r.name)}</span>
+            </div>
+          </td>
+          <td>${r.memberCount}</td>
+          <td>
+            <label class="toggle-switch" style="margin:0">
+              <input type="checkbox" ${isGlobal ? 'checked' : ''} onchange="adminToggleGlobal('${r.id}', this.checked)" />
+              <span class="toggle-slider" style="width:40px;height:22px"></span>
+            </label>
+          </td>
+          <td class="admin-actions-cell">
+            <button class="admin-btn admin-btn-sm" onclick="adminAddAllUsers('${r.id}', '${escapeHtml(r.name)}')" title="Adicionar todos os usuários a este grupo">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/>
+                <circle cx="8.5" cy="7" r="4"/>
+                <line x1="20" y1="8" x2="20" y2="14"/>
+                <line x1="23" y1="11" x2="17" y2="11"/>
+              </svg>
+              Add todos
+            </button>
+          </td>
+        </tr>
+      `;
+    }).join('');
+  } catch (err) {
+    console.error('adminLoadGroups erro:', err);
+    tbody.innerHTML = '<tr><td colspan="4" class="admin-loading" style="color:#e53935">Erro de conexão</td></tr>';
+  }
+}
+
+async function adminToggleGlobal(roomId, isGlobal) {
+  try {
+    const res = await fetch(`${API}/admin/rooms/${roomId}/global`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ isGlobal })
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      showToast(err.error || 'Erro ao alterar');
+      adminLoadGroups();
+      return;
+    }
+    const data = await res.json();
+    const msg = isGlobal
+      ? `Grupo marcado como global! ${data.added} usuário(s) adicionado(s)`
+      : 'Grupo removido dos globais';
+    showToast(msg);
+    adminLoadGroups();
+  } catch {
+    showToast('Erro de conexão.');
+    adminLoadGroups();
+  }
+}
+
+async function adminAddAllUsers(roomId, roomName) {
+  const ok = await showConfirm(`Adicionar todos os usuários existentes ao grupo "${escapeHtml(roomName)}"?`);
+  if (!ok) return;
+
+  try {
+    const res = await fetch(`${API}/admin/rooms/${roomId}/add-all-users`, {
+      method: 'POST'
+    });
+    if (!res.ok) {
+      showToast('Erro ao adicionar usuários');
+      return;
+    }
+    const data = await res.json();
+    showToast(`${data.added} usuário(s) adicionado(s)!`);
+    adminLoadGroups();
+  } catch {
+    showToast('Erro de conexão.');
+  }
+}
+
+// ── EVENT DELEGATION GLOBAL (só adiciona uma vez) ──────────
+let adminRoomDelegateAdded = false;
+document.addEventListener('DOMContentLoaded', function() {
+  const container = document.getElementById('admin-rooms-list');
+  if (!container || adminRoomDelegateAdded) return;
+  adminRoomDelegateAdded = true;
+  container.addEventListener('click', function(e) {
+    const card = e.target.closest('.admin-room-card');
+    if (!card) return;
+    const roomId = card.dataset.roomId;
+    const roomName = card.dataset.roomName;
+    if (roomId) adminOpenRoom(roomId, roomName);
+  });
+});

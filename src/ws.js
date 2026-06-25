@@ -3,7 +3,13 @@ const db = require('./db');
 
 const clients = new Map();
 const typingTimers = new Map();
-const recentMessages = new Map(); // dedup: authorId+content -> timestamp // roomId -> Set<username>
+const recentMessages = new Map(); // dedup: authorId+content -> timestamp
+
+function getRoomMembers(roomId) {
+  const data = db.read();
+  const room = data.rooms.find(r => r.id === roomId);
+  return room ? room.members : [];
+}
 
 function setupWebSocket(wss) {
   wss.on('connection', (ws, req) => {
@@ -59,12 +65,18 @@ function setupWebSocket(wss) {
     });
 
     ws.on('close', () => {
+      // Limpa qualquer timer de typing pendente
+      const client = clients.get(clientId);
+      if (client && client._typingTimer) {
+        clearTimeout(client._typingTimer);
+        client._typingTimer = null;
+      }
       clients.delete(clientId);
       // Remove typing status ao desconectar
       for (const [roomId, typingSet] of typingTimers.entries()) {
         if (typingSet.has(clientId)) {
           typingSet.delete(clientId);
-          broadcast({ type: 'typing_stop', roomId, username: user.username }, clientId);
+          broadcastToRoom(roomId, { type: 'typing_stop', roomId, username: user.username }, clientId);
         }
       }
       broadcastPresence();
@@ -100,20 +112,22 @@ function handleMessage(clientId, msg) {
 
   const data = db.read();
   const room = data.rooms.find(r => r.id === roomId);
-  if (!room || !room.members.includes(client.userId)) return;    const user = data.users.find(u => u.id === client.userId);
+  if (!room || !room.members.includes(client.userId)) return;
+  
+  const user = data.users.find(u => u.id === client.userId);
 
-    const message = {
-      id: 'msg_' + uuidv4().split('-')[0],
-      roomId,
-      authorId: client.userId,
-      authorName: client.username,
-      authorAvatarData: user?.avatarData || null,
-      content: content.trim(),
-      type: msgType || 'text',
-      timestamp: new Date().toISOString(),
-      edited: false,
-      deleted: false
-    };
+  const message = {
+    id: 'msg_' + uuidv4().split('-')[0],
+    roomId,
+    authorId: client.userId,
+    authorName: client.username,
+    authorAvatarData: user?.avatarData || null,
+    content: content.trim(),
+    type: msgType || 'text',
+    timestamp: new Date().toISOString(),
+    edited: false,
+    deleted: false
+  };
 
   if (replyTo) {
     const original = data.messages.find(m => m.id === replyTo);
@@ -143,8 +157,8 @@ function handleMessage(clientId, msg) {
   // Para o typing indicator quando envia
   stopTyping(clientId, roomId);
 
-  // NÃO envia de volta pro próprio remetente (ele já tem a msg local otimista)
-  broadcast({ type: 'new_message', message }, clientId);
+  // Só envia pra membros da sala (exceto remetente)
+  broadcastToRoom(roomId, { type: 'new_message', message }, clientId);
 }
 
 function handleTyping(clientId, msg) {
@@ -159,14 +173,14 @@ function handleTyping(clientId, msg) {
   
   if (!typingSet.has(clientId)) {
     typingSet.add(clientId);
-    broadcast({ type: 'typing_start', roomId, username: client.username }, clientId);
+    broadcastToRoom(roomId, { type: 'typing_start', roomId, username: client.username }, clientId);
   }
 
-  // Auto-stop depois de 3s se não enviar mais nada
+  // Auto-stop depois de 5s se não enviar mais nada (dava margem pro throttle)
   if (client._typingTimer) clearTimeout(client._typingTimer);
   client._typingTimer = setTimeout(() => {
     stopTyping(clientId, roomId);
-  }, 3000);
+  }, 5000);
 }
 
 function stopTyping(clientId, roomId) {
@@ -175,7 +189,7 @@ function stopTyping(clientId, roomId) {
   const typingSet = typingTimers.get(roomId);
   if (typingSet && typingSet.has(clientId)) {
     typingSet.delete(clientId);
-    broadcast({ type: 'typing_stop', roomId, username: client.username }, clientId);
+    broadcastToRoom(roomId, { type: 'typing_stop', roomId, username: client.username }, clientId);
   }
   if (client._typingTimer) {
     clearTimeout(client._typingTimer);
@@ -199,7 +213,7 @@ function handleDeleteMessage(clientId, msg) {
   data.messages[msgIndex].type = 'text';
   db.write(data);
 
-  broadcast({ type: 'message_deleted', messageId, roomId });
+  broadcastToRoom(roomId, { type: 'message_deleted', messageId, roomId });
 }
 
 function handleEditMessage(clientId, msg) {
@@ -218,7 +232,7 @@ function handleEditMessage(clientId, msg) {
   data.messages[msgIndex].edited = true;
   db.write(data);
 
-  broadcast({ type: 'message_edited', messageId, roomId, content: content.trim() });
+  broadcastToRoom(roomId, { type: 'message_edited', messageId, roomId, content: content.trim() });
 }
 
 function handleReadReceipt(clientId, msg) {
@@ -232,13 +246,25 @@ function handleReadReceipt(clientId, msg) {
   if (!message) return;
   if (message.authorId === client.userId) return; // não marca própria mensagem
 
-  broadcast({ type: 'read_receipt', messageId, roomId, reader: client.username });
+  broadcastToRoom(roomId, { type: 'read_receipt', messageId, roomId, reader: client.username });
 }
 
+// Envia pra todos os clients (presence, avatar)
 function broadcast(payload, excludeClientId) {
   const str = JSON.stringify(payload);
   for (const [id, { ws }] of clients.entries()) {
     if (id === excludeClientId) continue;
+    if (ws.readyState === 1) ws.send(str);
+  }
+}
+
+// Envia só pra membros da sala
+function broadcastToRoom(roomId, payload, excludeClientId) {
+  const members = getRoomMembers(roomId);
+  const str = JSON.stringify(payload);
+  for (const [id, { ws, userId }] of clients.entries()) {
+    if (id === excludeClientId) continue;
+    if (!members.includes(userId)) continue;
     if (ws.readyState === 1) ws.send(str);
   }
 }

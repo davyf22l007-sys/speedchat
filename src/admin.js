@@ -220,4 +220,80 @@ router.get('/users/:userId/rooms/:roomId/messages', requireAdmin, (req, res) => 
   res.json(messages);
 });
 
+// ── LISTAR TODAS AS SALAS (grupos não-DM) ──────────────
+router.get('/rooms', requireAdmin, (req, res) => {
+  // Força sempre dados frescos - sem cache
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+
+  const data = db.read();
+  const rooms = data.rooms
+    .filter(r => !r.isDM)
+    .map(r => ({
+      id: r.id,
+      name: r.name,
+      memberCount: r.members ? r.members.length : 0,
+      isGlobal: r.isGlobal || false,
+      createdAt: r.createdAt
+    }))
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+  res.json(rooms);
+});
+
+// ── ALTERNAR GRUPO GLOBAL (toggle) ──────────────────────
+router.put('/rooms/:roomId/global', requireAdmin, (req, res) => {
+  const data = db.read();
+  const room = data.rooms.find(r => r.id === req.params.roomId);
+
+  if (!room) {
+    return res.status(404).json({ error: 'Sala não encontrada.' });
+  }
+
+  if (room.isDM) {
+    return res.status(400).json({ error: 'Não pode marcar DM como global.' });
+  }
+
+  const { isGlobal } = req.body;
+  room.isGlobal = !!isGlobal;
+
+  // Quando marca como global, add automaticamente todos os users existentes
+  let added = 0;
+  if (room.isGlobal) {
+    data.users.forEach(u => {
+      if (!room.members.includes(u.id)) {
+        room.members.push(u.id);
+        added++;
+      }
+    });
+  }
+
+  db.write(data);
+
+  res.json({ ok: true, isGlobal: room.isGlobal, added });
+});
+
+// ── ADICIONAR TODOS OS USUÁRIOS EXISTENTES A UM GRUPO ───
+router.post('/rooms/:roomId/add-all-users', requireAdmin, (req, res) => {
+  const data = db.read();
+  const room = data.rooms.find(r => r.id === req.params.roomId);
+
+  if (!room) {
+    return res.status(404).json({ error: 'Sala não encontrada.' });
+  }
+
+  let added = 0;
+  data.users.forEach(u => {
+    if (!room.members.includes(u.id)) {
+      room.members.push(u.id);
+      added++;
+    }
+  });
+
+  db.write(data);
+
+  res.json({ ok: true, added });
+});
+
 module.exports = router;

@@ -48,15 +48,22 @@ router.post('/register', (req, res) => {
     username: trimmed,
     password: hash,
     avatarColor: color,
-    createdAt: new Date().toISOString()
+    createdAt: new Date().toISOString(),
+    bio: ''
   };
 
   data.users.push(newUser);
 
+  // Adiciona à sala geral e a todos os grupos globais
   const general = data.rooms.find(r => r.id === 'room_general');
   if (general && !general.members.includes(newUser.id)) {
     general.members.push(newUser.id);
   }
+  data.rooms.forEach(r => {
+    if (r.isGlobal && !r.members.includes(newUser.id)) {
+      r.members.push(newUser.id);
+    }
+  });
 
   data.sessions[token] = { userId: newUser.id, createdAt: new Date().toISOString() };
   db.write(data);
@@ -71,6 +78,7 @@ router.post('/register', (req, res) => {
     username: newUser.username,
     avatarColor: newUser.avatarColor,
     avatarData: newUser.avatarData || null,
+    bio: newUser.bio || '',
     isAdmin: newUser.isAdmin || false
   });
 });
@@ -104,6 +112,7 @@ router.post('/login', (req, res) => {
     username: user.username,
     avatarColor: user.avatarColor,
     avatarData: user.avatarData || null,
+    bio: user.bio || '',
     isAdmin: user.isAdmin || false
   });
 });
@@ -137,6 +146,7 @@ router.get('/me', (req, res) => {
     username: user.username,
     avatarColor: user.avatarColor,
     avatarData: user.avatarData || null,
+    bio: user.bio || '',
     isAdmin: user.isAdmin || false
   });
 });

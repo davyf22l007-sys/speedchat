@@ -14,7 +14,7 @@ const app = express();
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server, path: '/ws' });
 
-app.use(express.json({ limit: '300mb' }));
+app.use(express.json({ limit: '10mb' }));
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, '../public')));
 
