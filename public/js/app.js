@@ -1301,7 +1301,6 @@ $('image-file-input').addEventListener('change', async e => {
     const json = await res.json();
     if (!res.ok) throw new Error(json.error || 'Falha no upload');
     const url = json.url;
-    const url = json.url;
     loadingRow.remove();
     const pendingId = 'pending_' + Date.now();
     pendingMessages.push({ id: pendingId, roomId: currentRoomId, content: url, msgType: 'image', replyTo: null });
