@@ -162,8 +162,9 @@ function handleMessage(clientId, msg) {
   // Para o typing indicator quando envia
   stopTyping(clientId, roomId);
 
-  // Só envia pra membros da sala (exceto remetente)
-  broadcastToRoom(roomId, { type: 'new_message', message }, clientId);
+  // Envia pra todos os membros da sala (inclusive remetente)
+  // O remetente usa o _pendingId pra identificar a própria mensagem e trocar o reloginho pelo tick
+  broadcastToRoom(roomId, { type: 'new_message', message });
 }
 
 function handleTyping(clientId, msg) {
