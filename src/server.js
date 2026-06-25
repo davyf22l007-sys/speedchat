@@ -32,19 +32,15 @@ setupWebSocket(wss);
 const PORT = process.env.PORT || 3456;
 const PUBLIC_URL = process.env.PUBLIC_URL || `http://localhost:${PORT}`;
 
-server.listen(PORT, '0.0.0.0', () => {
-  console.log(`SpeedChat rodando em ${PUBLIC_URL}`);
+// Inicializar banco de dados PostgreSQL
+const db = require('./db');
+db.init().then(() => {
+  console.log('Banco de dados PostgreSQL conectado!');
+  server.listen(PORT, '0.0.0.0', () => {
+    console.log(`SpeedChat rodando em ${PUBLIC_URL}`);
+  });
+}).catch(err => {
+  console.error('Erro ao conectar banco:', err);
+  process.exit(1);
 });
 
-// Salva dados em disco antes de desligar
-const db = require('./db');
-process.on('SIGTERM', () => {
-  console.log('SIGTERM recebido, salvando dados...');
-  db.flush();
-  process.exit(0);
-});
-process.on('SIGINT', () => {
-  console.log('SIGINT recebido, salvando dados...');
-  db.flush();
-  process.exit(0);
-});
