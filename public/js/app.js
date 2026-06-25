@@ -700,13 +700,21 @@ function updateTypingUI(roomId) {
 }
 
 async function handleNewMessage(message) {
-  // Remove mensagem temporária se existir
-  const tmpRows = document.querySelectorAll(`.message-row[data-msg-id^="tmp_"]`);
-  for (const row of tmpRows) {
-    if (row.querySelector('.bubble')?.textContent?.trim() === message.content?.trim() &&
-        row.classList.contains('out')) {
-      row.remove();
-      break;
+  // Se for mensagem do próprio usuário: já temos a mensagem local otimista
+  // Só atualiza o ID da temporária pro ID real do servidor
+  if (message.authorId === currentUser.id) {
+    const tmpRows = document.querySelectorAll(`.message-row[data-msg-id^="tmp_"]`);
+    for (const row of tmpRows) {
+      if (row.classList.contains('out')) {
+        // Confere se o conteúdo bate (ignorando diferenças de formatação)
+        const bubbleText = row.querySelector('.bubble')?.textContent?.trim();
+        const msgText = message.content?.trim();
+        if (bubbleText === msgText) {
+          // Atualiza o ID da mensagem temporária pro ID real
+          row.dataset.msgId = message.id;
+          return; // Não adiciona de novo!
+        }
+      }
     }
   }
 

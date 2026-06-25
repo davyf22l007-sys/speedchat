@@ -2,7 +2,7 @@ const { v4: uuidv4 } = require('uuid');
 const db = require('./db');
 
 const clients = new Map();
-const typingTimers = new Map();
+const typingTimers = new Map();
 const recentMessages = new Map(); // dedup: authorId+content -> timestamp // roomId -> Set<username>
 
 function setupWebSocket(wss) {
@@ -72,24 +72,26 @@ function setupWebSocket(wss) {
   });
 }
 
+const processedMsgIds = new Set(); // dedup global por ID
+
 function handleMessage(clientId, msg) {
-  // Dedup: ignorar mesma mensagem em menos de 3s
+  // Dedup: ignorar mesma mensagem em menos de 10s
   if (msg.content) {
     const dedupKey = clientId + ':' + msg.content + ':' + (msg.roomId || '');
     const now = Date.now();
     if (recentMessages.has(dedupKey)) {
       const last = recentMessages.get(dedupKey);
-      if (now - last < 3000) return;
+      if (now - last < 10000) return;
     }
     recentMessages.set(dedupKey, now);
-    // Limpar entradas antigas a cada 50 mensagens
-    if (recentMessages.size > 50) {
-      const cutoff = now - 10000;
+    // Limpar entradas antigas a cada 100 mensagens
+    if (recentMessages.size > 100) {
+      const cutoff = now - 30000;
       for (const [k, t] of recentMessages) {
         if (t < cutoff) recentMessages.delete(k);
       }
     }
-  }
+  }
   const client = clients.get(clientId);
   if (!client) return;
 
@@ -125,13 +127,24 @@ function handleMessage(clientId, msg) {
     }
   }
 
+  // Dedup por ID de mensagem (pra reconexao)
+  if (processedMsgIds.has(message.id)) return;
+  processedMsgIds.add(message.id);
+  // Limpa IDs antigos a cada 200 mensagens
+  if (processedMsgIds.size > 200) {
+    const idsArray = [...processedMsgIds];
+    processedMsgIds.clear();
+    idsArray.slice(-100).forEach(id => processedMsgIds.add(id));
+  }
+
   data.messages.push(message);
   db.write(data);
 
   // Para o typing indicator quando envia
   stopTyping(clientId, roomId);
 
-  broadcast({ type: 'new_message', message });
+  // NÃO envia de volta pro próprio remetente (ele já tem a msg local otimista)
+  broadcast({ type: 'new_message', message }, clientId);
 }
 
 function handleTyping(clientId, msg) {
