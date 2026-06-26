@@ -57,17 +57,71 @@ async function init() {
       await pool.query('SELECT 1');
   const sql = `CREATE TABLE IF NOT EXISTS app_state (id INTEGER PRIMARY KEY, data JSONB NOT NULL DEFAULT '{}'::jsonb)`;
   await pool.query(sql);
+      // Carrega do PostgreSQL primeiro
       const r = await pool.query('SELECT data FROM app_state WHERE id = 1');
-      if (r.rows.length === 0) {
-        cache = getInitialData();
-        await pool.query('INSERT INTO app_state (id, data) VALUES (1, $1)', [JSON.stringify(cache)]);
-        console.log('Dados iniciais criados no PostgreSQL.');
-      } else {
+      
+      if (r.rows.length > 0) {
+        // Postgres tem dados - verifica se sao validos (admin existe)
         const raw = r.rows[0].data;
-        cache = typeof raw === 'string' ? JSON.parse(raw) : raw;
-        ensureAdmin(cache);
-        await pool.query('UPDATE app_state SET data = $1 WHERE id = 1', [JSON.stringify(cache)]);
-        console.log('Dados carregados do PostgreSQL (' + cache.users.length + ' usuarios, ' + cache.rooms.length + ' salas).');
+        const pgData = typeof raw === 'string' ? JSON.parse(raw) : raw;
+        const hasAdmin = pgData.users && pgData.users.some(function(u) { return u.id === 'user_admin' || u.isAdmin; });
+        
+        if (hasAdmin && pgData.rooms && pgData.rooms.length > 2) {
+          // Dados do postgres sao validos - usa eles
+          cache = pgData;
+          ensureAdmin(cache);
+          await pool.query('UPDATE app_state SET data = $1 WHERE id = 1', [JSON.stringify(cache)]);
+          console.log('Dados carregados do PostgreSQL (' + cache.users.length + ' usuarios, ' + cache.rooms.length + ' salas).');
+        } else {
+          // Postgres corrompido (spam) - tenta carregar do db.json
+          console.log('PostgreSQL parece corrompido (sem admin valido), tentando db.json...');
+          const dbJsonPath = path.resolve(__dirname, '../data/db.json');
+          if (fs.existsSync(dbJsonPath)) {
+            try {
+              const rawJson = fs.readFileSync(dbJsonPath, 'utf-8');
+              const jsonData = JSON.parse(rawJson);
+              if (jsonData.users && jsonData.users.length > 0 && jsonData.rooms && jsonData.rooms.length > 0) {
+                cache = jsonData;
+                ensureAdmin(cache);
+                await pool.query('INSERT INTO app_state (id, data) VALUES (1, $1) ON CONFLICT (id) DO UPDATE SET data = $1', [JSON.stringify(cache)]);
+                console.log('Dados carregados do db.json (' + cache.users.length + ' usuarios, ' + cache.rooms.length + ' salas, ' + (cache.messages ? cache.messages.length : 0) + ' mensagens).');
+              } else { throw new Error('db.json vazio'); }
+            } catch (e2) {
+              console.log('Erro ao carregar db.json, criando dados iniciais:', e2.message);
+              cache = getInitialData();
+              await pool.query('INSERT INTO app_state (id, data) VALUES (1, $1)', [JSON.stringify(cache)]);
+              console.log('Dados iniciais criados no PostgreSQL.');
+            }
+          } else {
+            // Sem db.json, cria dados iniciais
+            cache = getInitialData();
+            await pool.query('INSERT INTO app_state (id, data) VALUES (1, $1)', [JSON.stringify(cache)]);
+            console.log('Dados iniciais criados no PostgreSQL (sem db.json).');
+          }
+        }
+      } else {
+        // Postgres vazio - tenta carregar do db.json
+        console.log('PostgreSQL vazio, tentando db.json...');
+        const dbJsonPath = path.resolve(__dirname, '../data/db.json');
+        let loadedFromJson = false;
+        if (fs.existsSync(dbJsonPath)) {
+          try {
+            const rawJson = fs.readFileSync(dbJsonPath, 'utf-8');
+            const jsonData = JSON.parse(rawJson);
+            if (jsonData.users && jsonData.users.length > 0 && jsonData.rooms && jsonData.rooms.length > 0) {
+              cache = jsonData;
+              ensureAdmin(cache);
+              await pool.query('INSERT INTO app_state (id, data) VALUES (1, $1)', [JSON.stringify(cache)]);
+              console.log('Dados carregados do db.json (' + cache.users.length + ' usuarios, ' + cache.rooms.length + ' salas, ' + (cache.messages ? cache.messages.length : 0) + ' mensagens).');
+              loadedFromJson = true;
+            }
+          } catch (e) { console.log('Erro ao ler db.json:', e.message); }
+        }
+        if (!loadedFromJson) {
+          cache = getInitialData();
+          await pool.query('INSERT INTO app_state (id, data) VALUES (1, $1)', [JSON.stringify(cache)]);
+          console.log('Dados iniciais criados no PostgreSQL.');
+        }
       }
       db = pool;
       usingPostgres = true;
