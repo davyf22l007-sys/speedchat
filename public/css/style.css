@@ -3908,16 +3908,3 @@ button:focus, button:focus-visible { outline: none !important; box-shadow: none;
   font-weight: 600;
 }
 
-
-/* ── Admin Badge no Header do Chat ── */
-.admin-badge-header {
-  font-size: 10px;
-  font-weight: 700;
-  background: #667781;
-  color: #fff;
-  padding: 1px 6px;
-  border-radius: 4px;
-  letter-spacing: 0.3px;
-  line-height: 1.4;
-  white-space: nowrap;
-}

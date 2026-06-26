@@ -434,11 +434,6 @@ async function openRoom(room) {
   const av = $('chat-avatar');
   renderAvatar(av, room.name, color, room.avatarData);
   $('chat-name').textContent = room.name;
-  // Mostra/esconde badge de admin no header
-  var _badge = $('chat-admin-badge');
-  if (_badge) {
-    _badge.classList.toggle('hidden', room.isDM || !currentUser || !currentUser.isAdmin);
-  }
 
   // Tenta usar cache primeiro
   const cached = messagesCache[room.id];

@@ -390,7 +390,8 @@ router.get('/users', requireAuth, (req, res) => {
     username: u.username,
     avatarColor: u.avatarColor,
     avatarData: u.avatarData || null,
-    bio: u.bio || ''
+    bio: u.bio || '',
+    isAdmin: u.isAdmin || false
   }));
   res.json(users);
 });
