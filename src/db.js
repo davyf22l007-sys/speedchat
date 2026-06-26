@@ -7,10 +7,10 @@ const DB_PATH = path.resolve(__dirname, '../data/db.json');
 const ADMIN_USERNAME = process.env.ADMIN_USER || 'davyf22l';
 const ADMIN_PASSWORD = process.env.ADMIN_PASS || '@Davyf22l5820';
 
-// Cache em memoria - evita ler do disco em toda requisicao
+let pool = null;
+let usingPostgres = false;
 let cache = null;
 let saveTimer = null;
-let isSaving = false;
 
 function getInitialData() {
   const adminHash = bcrypt.hashSync(ADMIN_PASSWORD, 10);
@@ -44,7 +44,6 @@ function getInitialData() {
 }
 
 function ensureAdmin(data) {
-  // Só o user com id 'user_admin' pode ser super admin
   const superAdmin = data.users.find(u => u.id === 'user_admin');
   if (superAdmin) {
     superAdmin.isAdmin = true;
@@ -53,7 +52,6 @@ function ensureAdmin(data) {
     if (general && !general.members.includes(superAdmin.id)) {
       general.members.push(superAdmin.id);
     }
-    // Garante que nenhum outro usuario tenha isSuperAdmin
     data.users.forEach(u => {
       if (u.id !== 'user_admin') {
         u.isSuperAdmin = false;
@@ -78,6 +76,72 @@ function ensureAdmin(data) {
   }
   return true;
 }
+
+// ── INICIALIZAÇÃO ASSÍNCRONA ─────────────────────────────
+
+async function init() {
+  const DATABASE_URL = process.env.DATABASE_URL;
+  if (DATABASE_URL) {
+    try {
+      const { Pool } = require('pg');
+      pool = new Pool({
+        connectionString: DATABASE_URL,
+        ssl: process.env.NODE_ENV === 'production'
+          ? { rejectUnauthorized: false }
+          : false
+      });
+
+      // Testa conexão
+      await pool.query('SELECT 1');
+
+      // Cria tabela se não existir
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS app_state (
+          id INTEGER PRIMARY KEY,
+          data JSONB NOT NULL DEFAULT '{}'::jsonb
+        )
+      `);
+
+      // Carrega dados existentes ou cria iniciais
+      const result = await pool.query('SELECT data FROM app_state WHERE id = 1');
+      if (result.rows.length === 0) {
+        cache = getInitialData();
+        await pool.query(
+          'INSERT INTO app_state (id, data) VALUES (1, $1)',
+          [JSON.stringify(cache)]
+        );
+        console.log('📦 Dados iniciais criados no PostgreSQL.');
+      } else {
+        const raw = result.rows[0].data;
+        cache = typeof raw === 'string' ? JSON.parse(raw) : raw;
+        if (ensureAdmin(cache)) {
+          await pool.query(
+            'UPDATE app_state SET data = $1 WHERE id = 1',
+            [JSON.stringify(cache)]
+          );
+        }
+        console.log(`📦 Dados carregados do PostgreSQL (${cache.users.length} usuários, ${cache.rooms.length} salas, ${cache.messages.length} mensagens).`);
+      }
+
+      usingPostgres = true;
+      console.log('✅ PostgreSQL conectado com sucesso!');
+      return;
+    } catch (err) {
+      console.error('❌ Erro ao conectar PostgreSQL:', err.message);
+      console.log('📁 Usando db.json como fallback...');
+      if (pool) {
+        try { await pool.end(); } catch {}
+        pool = null;
+      }
+    }
+  }
+
+  // Fallback: carrega do arquivo local
+  cache = loadFromDisk();
+  console.log('📁 Usando db.json local.');
+}
+
+// ── LEITURA / ESCRITA EM ARQUIVO ─────────────────────────
 
 function loadFromDisk() {
   try {
@@ -112,15 +176,33 @@ function saveToDisk(data) {
   }
 }
 
+// ── LEITURA / ESCRITA NO POSTGRESQL ──────────────────────
+
+async function saveToPostgres(data) {
+  if (!pool) return;
+  try {
+    await pool.query(
+      'UPDATE app_state SET data = $1 WHERE id = 1',
+      [JSON.stringify(data)]
+    );
+  } catch (err) {
+    console.error('Erro ao salvar no PostgreSQL:', err.message);
+  }
+}
+
 function scheduleSave(data) {
   if (saveTimer) clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
-    saveToDisk(data);
     saveTimer = null;
+    if (usingPostgres) {
+      saveToPostgres(data);
+    } else {
+      saveToDisk(data);
+    }
   }, 200);
 }
 
-// --- API PUBLICA ---
+// ── API PÚBLICA ──────────────────────────────────────────
 
 function read() {
   if (!cache) {
@@ -134,13 +216,25 @@ function write(data) {
   scheduleSave(data);
 }
 
-// Forca save imediato (pra usar antes de desligar)
-function flush() {
+async function flush() {
   if (cache) {
     if (saveTimer) clearTimeout(saveTimer);
     saveTimer = null;
-    saveToDisk(cache);
+    if (usingPostgres) {
+      try {
+        await saveToPostgres(cache);
+        console.log('💾 Dados salvos no PostgreSQL.');
+      } catch (err) {
+        console.error('Erro ao salvar no PostgreSQL durante flush:', err.message);
+      }
+      try {
+        await pool.end();
+        pool = null;
+      } catch {}
+    } else {
+      saveToDisk(cache);
+    }
   }
 }
 
-module.exports = { read, write, flush };
+module.exports = { init, read, write, flush };

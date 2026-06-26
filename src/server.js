@@ -42,19 +42,29 @@ server.on('error', (err) => {
   process.exit(1);
 });
 
-server.listen(PORT, '0.0.0.0', () => {
-  console.log(`SpeedChat rodando em ${PUBLIC_URL}`);
+// Inicia o servidor depois de conectar o banco
+async function start() {
+  await db.init();
+
+  server.listen(PORT, '0.0.0.0', () => {
+    console.log(`SpeedChat rodando em ${PUBLIC_URL}`);
+  });
+}
+
+start().catch(err => {
+  console.error('Erro fatal ao iniciar:', err);
+  process.exit(1);
 });
 
-// Salva dados em disco antes de desligar
-process.on('SIGTERM', () => {
+// Salva dados antes de desligar
+process.on('SIGTERM', async () => {
   console.log('SIGTERM recebido, salvando dados...');
-  db.flush();
+  try { await db.flush(); } catch {}
   process.exit(0);
 });
-process.on('SIGINT', () => {
+process.on('SIGINT', async () => {
   console.log('SIGINT recebido, salvando dados...');
-  db.flush();
+  try { await db.flush(); } catch {}
   process.exit(0);
 });
 
