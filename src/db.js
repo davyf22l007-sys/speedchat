@@ -1,13 +1,17 @@
 const fs = require('fs');
 const path = require('path');
 const bcrypt = require('bcryptjs');
+let Database = null;
+try { Database = require('better-sqlite3'); } catch {}
 
-const DB_PATH = path.resolve(__dirname, '../data/db.json');
+const DB_DIR = process.env.SPEEDCHAT_DB_DIR || 'D:\speedchat_data';
+const DB_PATH = path.join(DB_DIR, 'speedchat.db');
 
 const ADMIN_USERNAME = process.env.ADMIN_USER;
 const ADMIN_PASSWORD = process.env.ADMIN_PASS;
 
-let pool = null;
+let db = null;
+let sqliteDb = null;
 let usingPostgres = false;
 let cache = null;
 let saveTimer = null;
@@ -16,207 +20,118 @@ function getInitialData() {
   const adminHash = bcrypt.hashSync(ADMIN_PASSWORD, 10);
   const adminId = 'user_admin';
   return {
-    users: [
-      {
-        id: adminId,
-        username: ADMIN_USERNAME,
-        password: adminHash,
-        avatarColor: '#e74c3c',
-        isAdmin: true,
-        isSuperAdmin: true,
-        createdAt: new Date().toISOString()
-      }
-    ],
-    rooms: [
-      {
-        id: 'room_general',
-        name: 'Geral',
-        isDM: false,
-        members: [adminId],
-        avatarColor: '#25D366',
-        createdAt: new Date().toISOString()
-      }
-    ],
-    messages: [],
-    sessions: {},
-    clearedAt: {}
+    users: [{ id: adminId, username: ADMIN_USERNAME, password: adminHash, avatarColor: '#e74c3c', isAdmin: true, isSuperAdmin: true, createdAt: new Date().toISOString() }],
+    rooms: [{ id: 'room_general', name: 'Geral', isDM: false, members: [adminId], avatarColor: '#25D366', createdAt: new Date().toISOString() }],
+    messages: [], sessions: {}, clearedAt: {}
   };
 }
 
 function ensureAdmin(data) {
-  const superAdmin = data.users.find(u => u.id === 'user_admin');
-  if (superAdmin) {
-    superAdmin.isAdmin = true;
-    superAdmin.isSuperAdmin = true;
-    const general = data.rooms.find(r => r.id === 'room_general');
-    if (general && !general.members.includes(superAdmin.id)) {
-      general.members.push(superAdmin.id);
-    }
-    data.users.forEach(u => {
-      if (u.id !== 'user_admin') {
-        u.isSuperAdmin = false;
-      }
-    });
+  const sa = data.users.find(u => u.id === 'user_admin');
+  if (sa) {
+    sa.isAdmin = true; sa.isSuperAdmin = true;
+    const g = data.rooms.find(r => r.id === 'room_general');
+    if (g && !g.members.includes(sa.id)) g.members.push(sa.id);
+    data.users.forEach(u => { if (u.id !== 'user_admin') u.isSuperAdmin = false; });
     return false;
   }
-  const adminHash = bcrypt.hashSync(ADMIN_PASSWORD, 10);
-  const adminId = 'user_admin';
-  data.users.push({
-    id: adminId,
-    username: ADMIN_USERNAME,
-    password: adminHash,
-    avatarColor: '#e74c3c',
-    isAdmin: true,
-    isSuperAdmin: true,
-    createdAt: new Date().toISOString()
-  });
-  const general = data.rooms.find(r => r.id === 'room_general');
-  if (general && !general.members.includes(adminId)) {
-    general.members.push(adminId);
-  }
+  const h = bcrypt.hashSync(ADMIN_PASSWORD, 10);
+  data.users.push({ id: 'user_admin', username: ADMIN_USERNAME, password: h, avatarColor: '#e74c3c', isAdmin: true, isSuperAdmin: true, createdAt: new Date().toISOString() });
+  const g = data.rooms.find(r => r.id === 'room_general');
+  if (g && !g.members.includes('user_admin')) g.members.push('user_admin');
   return true;
 }
 
-// ── INICIALIZAÇÃO ASSÍNCRONA ─────────────────────────────
-
 async function init() {
-  // Valida credenciais do admin - env vars SÃO obrigatórias
   if (!ADMIN_USERNAME || !ADMIN_PASSWORD) {
-    throw new Error(
-      '❌ ADMIN_USER e ADMIN_PASS são obrigatórios!\n' +
-      '   Configure as variáveis de ambiente antes de iniciar:\n' +
-      '   ADMIN_USER=seu_nome ADMIN_PASS=sua_senha npm start'
-    );
+    throw new Error('ADMIN_USER e ADMIN_PASS sao obrigatorios!');
   }
 
   const DATABASE_URL = process.env.DATABASE_URL;
+
+  // Tenta PostgreSQL primeiro (se tiver DATABASE_URL)
   if (DATABASE_URL) {
     try {
       const { Pool } = require('pg');
-      pool = new Pool({
-        connectionString: DATABASE_URL,
-        ssl: process.env.NODE_ENV === 'production'
-          ? { rejectUnauthorized: false }
-          : false
-      });
-
-      // Testa conexão
+      const pool = new Pool({ connectionString: DATABASE_URL, ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false });
       await pool.query('SELECT 1');
-
-      // Cria tabela se não existir
-      await pool.query(`
-        CREATE TABLE IF NOT EXISTS app_state (
-          id INTEGER PRIMARY KEY,
-          data JSONB NOT NULL DEFAULT '{}'::jsonb
-        )
-      `);
-
-      // Carrega dados existentes ou cria iniciais
-      const result = await pool.query('SELECT data FROM app_state WHERE id = 1');
-      if (result.rows.length === 0) {
+  const sql = `CREATE TABLE IF NOT EXISTS app_state (id INTEGER PRIMARY KEY, data JSONB NOT NULL DEFAULT '{}'::jsonb)`;
+  await pool.query(sql);
+      const r = await pool.query('SELECT data FROM app_state WHERE id = 1');
+      if (r.rows.length === 0) {
         cache = getInitialData();
-        await pool.query(
-          'INSERT INTO app_state (id, data) VALUES (1, $1)',
-          [JSON.stringify(cache)]
-        );
-        console.log('📦 Dados iniciais criados no PostgreSQL.');
+        await pool.query('INSERT INTO app_state (id, data) VALUES (1, $1)', [JSON.stringify(cache)]);
+        console.log('Dados iniciais criados no PostgreSQL.');
       } else {
-        const raw = result.rows[0].data;
+        const raw = r.rows[0].data;
         cache = typeof raw === 'string' ? JSON.parse(raw) : raw;
-        if (ensureAdmin(cache)) {
-          await pool.query(
-            'UPDATE app_state SET data = $1 WHERE id = 1',
-            [JSON.stringify(cache)]
-          );
-        }
-        console.log(`📦 Dados carregados do PostgreSQL (${cache.users.length} usuários, ${cache.rooms.length} salas, ${cache.messages.length} mensagens).`);
+        ensureAdmin(cache);
+        await pool.query('UPDATE app_state SET data = $1 WHERE id = 1', [JSON.stringify(cache)]);
+        console.log('Dados carregados do PostgreSQL (' + cache.users.length + ' usuarios, ' + cache.rooms.length + ' salas).');
       }
-
+      db = pool;
       usingPostgres = true;
-      console.log('✅ PostgreSQL conectado com sucesso!');
+      console.log('PostgreSQL conectado!');
       return;
     } catch (err) {
-      console.error('❌ Erro ao conectar PostgreSQL:', err.message);
-      console.log('📁 Usando db.json como fallback...');
-      if (pool) {
-        try { await pool.end(); } catch {}
-        pool = null;
-      }
+      console.error('Erro ao conectar PostgreSQL:', err.message);
+      console.log('Usando SQLite como fallback...');
+      if (db) { try { await db.end(); } catch {} db = null; }
     }
   }
 
-  // Fallback: carrega do arquivo local
-  cache = loadFromDisk();
-  console.log('📁 Usando db.json local.');
-}
+  // Fallback: SQLite local
+  if (!Database) {
+    throw new Error('better-sqlite3 nao instalado e sem DATABASE_URL');
+  }
+  fs.mkdirSync(DB_DIR, { recursive: true });
+  sqliteDb = new Database(DB_PATH);
+  sqliteDb.pragma('journal_mode = WAL');
+  sqliteDb.exec('CREATE TABLE IF NOT EXISTS app_state (id INTEGER PRIMARY KEY, data TEXT)');
 
-// ── LEITURA / ESCRITA EM ARQUIVO ─────────────────────────
-
-function loadFromDisk() {
-  try {
-    if (!fs.existsSync(DB_PATH)) {
-      const data = getInitialData();
-      fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
-      fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 2), 'utf-8');
-      return data;
-    }
-    const raw = fs.readFileSync(DB_PATH, 'utf-8');
-    const data = JSON.parse(raw);
-    if (ensureAdmin(data)) {
-      scheduleSave(data);
-    }
-    return data;
-  } catch (err) {
-    console.error('Erro ao carregar db.json, criando dados iniciais:', err.message);
-    const data = getInitialData();
+  const row = sqliteDb.prepare('SELECT data FROM app_state WHERE id = 1').get();
+  if (row) {
     try {
-      fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 2), 'utf-8');
-    } catch {}
-    return data;
+      cache = JSON.parse(row.data);
+      ensureAdmin(cache);
+      saveToSqlite(cache);
+      console.log('Dados carregados do SQLite (' + cache.users.length + ' usuarios, ' + cache.rooms.length + ' salas).');
+    } catch (e) {
+      console.error('Erro ao ler SQLite, recriando:', e.message);
+      cache = getInitialData();
+      saveToSqlite(cache);
+    }
+  } else {
+    cache = getInitialData();
+    saveToSqlite(cache);
+    console.log('Dados iniciais criados no SQLite.');
   }
+  console.log('Banco: ' + DB_PATH);
 }
-
-function saveToDisk(data) {
-  try {
-    fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
-    fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 2), 'utf-8');
-  } catch (err) {
-    console.error('Erro ao salvar db.json:', err.message);
-  }
-}
-
-// ── LEITURA / ESCRITA NO POSTGRESQL ──────────────────────
 
 async function saveToPostgres(data) {
-  if (!pool) return;
-  try {
-    await pool.query(
-      'UPDATE app_state SET data = $1 WHERE id = 1',
-      [JSON.stringify(data)]
-    );
-  } catch (err) {
-    console.error('Erro ao salvar no PostgreSQL:', err.message);
-  }
+  if (!db) return;
+  try { await db.query('UPDATE app_state SET data = $1 WHERE id = 1', [JSON.stringify(data)]); }
+  catch (err) { console.error('Erro ao salvar no PostgreSQL:', err.message); }
+}
+
+function saveToSqlite(data) {
+  if (!sqliteDb) return;
+  try { sqliteDb.prepare('INSERT OR REPLACE INTO app_state (id, data) VALUES (1, ?)').run(JSON.stringify(data)); }
+  catch (err) { console.error('Erro ao salvar no SQLite:', err.message); }
 }
 
 function scheduleSave(data) {
   if (saveTimer) clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
     saveTimer = null;
-    if (usingPostgres) {
-      saveToPostgres(data);
-    } else {
-      saveToDisk(data);
-    }
+    if (usingPostgres) saveToPostgres(data);
+    else saveToSqlite(data);
   }, 200);
 }
 
-// ── API PÚBLICA ──────────────────────────────────────────
-
 function read() {
-  if (!cache) {
-    cache = loadFromDisk();
-  }
+  if (!cache) throw new Error('Banco nao inicializado.');
   return cache;
 }
 
@@ -230,18 +145,13 @@ async function flush() {
     if (saveTimer) clearTimeout(saveTimer);
     saveTimer = null;
     if (usingPostgres) {
-      try {
-        await saveToPostgres(cache);
-        console.log('💾 Dados salvos no PostgreSQL.');
-      } catch (err) {
-        console.error('Erro ao salvar no PostgreSQL durante flush:', err.message);
-      }
-      try {
-        await pool.end();
-        pool = null;
-      } catch {}
+      await saveToPostgres(cache);
+      console.log('Dados salvos no PostgreSQL.');
+      try { await db.end(); } catch {} db = null;
     } else {
-      saveToDisk(cache);
+      saveToSqlite(cache);
+      console.log('Dados salvos no SQLite.');
+      try { sqliteDb.close(); } catch {} sqliteDb = null;
     }
   }
 }
