@@ -57,8 +57,14 @@ function put(path, body, cookie) {
 async function main() {
   console.log('=== TESTE API SENHA ===\n');
 
-  // 1. Login
-  const login = await post('/auth/login', { username: 'davyf22l', password: '@Davyf22l5820' });
+  // 1. Login - usa env vars (sem fallback por segurança)
+  const adminUser = process.env.ADMIN_USER;
+  const adminPass = process.env.ADMIN_PASS;
+  if (!adminUser || !adminPass) {
+    console.log('❌ Configure ADMIN_USER e ADMIN_PASS pra rodar os testes');
+    return;
+  }
+  const login = await post('/auth/login', { username: adminUser, password: adminPass });
   const cookie = login.cookie;
   console.log('1. LOGIN:', login.status, cookie ? 'OK' : 'FAIL');
 

@@ -4,8 +4,8 @@ const bcrypt = require('bcryptjs');
 
 const DB_PATH = path.resolve(__dirname, '../data/db.json');
 
-const ADMIN_USERNAME = process.env.ADMIN_USER || 'davyf22l';
-const ADMIN_PASSWORD = process.env.ADMIN_PASS || '@Davyf22l5820';
+const ADMIN_USERNAME = process.env.ADMIN_USER;
+const ADMIN_PASSWORD = process.env.ADMIN_PASS;
 
 let pool = null;
 let usingPostgres = false;
@@ -80,6 +80,15 @@ function ensureAdmin(data) {
 // ── INICIALIZAÇÃO ASSÍNCRONA ─────────────────────────────
 
 async function init() {
+  // Valida credenciais do admin - env vars SÃO obrigatórias
+  if (!ADMIN_USERNAME || !ADMIN_PASSWORD) {
+    throw new Error(
+      '❌ ADMIN_USER e ADMIN_PASS são obrigatórios!\n' +
+      '   Configure as variáveis de ambiente antes de iniciar:\n' +
+      '   ADMIN_USER=seu_nome ADMIN_PASS=sua_senha npm start'
+    );
+  }
+
   const DATABASE_URL = process.env.DATABASE_URL;
   if (DATABASE_URL) {
     try {
