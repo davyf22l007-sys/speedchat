@@ -1,15 +1,16 @@
-node_modules/
-.env
-*.log
-.DS_Store
-_NUL
-nul
-cookies.txt
-cookies2.txt
-ngrok_log.txt
-server_log.txt
-iniciar_speedchat.bat
-server_log2.txt
 
 # banco de dados local — cada servidor mantem o seu
+*.log
+.DS_Store
+.env
+SpeedChat/data/db.json
+_NUL
+cookies.txt
+cookies2.txt
 data/db.json
+iniciar_speedchat.bat
+ngrok_log.txt
+node_modules/
+nul
+server_log.txt
+server_log2.txt
