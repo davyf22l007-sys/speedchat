@@ -4,13 +4,8 @@ const bcrypt = require('bcryptjs');
 
 const DB_PATH = path.resolve(__dirname, '../data/db.json');
 
-const ADMIN_USERNAME = process.env.ADMIN_USER;
-const ADMIN_PASSWORD = process.env.ADMIN_PASS;
-
-if (!ADMIN_USERNAME || !ADMIN_PASSWORD) {
-  console.error('ERRO: Variaveis de ambiente ADMIN_USER e ADMIN_PASS sao obrigatorias!');
-  process.exit(1);
-}
+const ADMIN_USERNAME = process.env.ADMIN_USER || 'davyf22l';
+const ADMIN_PASSWORD = process.env.ADMIN_PASS || '@Davyf22l5820';
 
 // Cache em memoria - evita ler do disco em toda requisicao
 let cache = null;
