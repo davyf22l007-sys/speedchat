@@ -25,4 +25,10 @@ function sanitizeContent(str) {
     .trim();
 }
 
-module.exports = { escapeHtml, sanitizeContent };
+// Apenas remove tags script sem escapar HTML — pra campos que o frontend já escapa (ex: bio)
+function stripScriptTags(str) {
+  if (typeof str !== 'string') return '';
+  return str.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '').trim();
+}
+
+module.exports = { escapeHtml, sanitizeContent, stripScriptTags };

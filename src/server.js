@@ -19,6 +19,46 @@ app.use(cookieParser());
 
 // Trust proxy pro rate limit e cookie secure funcionarem atras de proxy (Render, etc)
 app.set('trust proxy', 1);
+
+// ── CSRF Protection via Origin/Referer check ────────────────
+app.use((req, res, next) => {
+  // Só verifica métodos que alteram estado
+  if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) {
+    return next();
+  }
+
+  // Pula verificação pra rotas de auth (login/register precisam funcionar)
+  if (req.path.startsWith('/auth/')) {
+    return next();
+  }
+
+  const origin = req.get('Origin');
+  const referer = req.get('Referer');
+  const host = req.get('Host');
+
+  // Se não tem Origin nem Referer, permite (requests via curl, etc)
+  if (!origin && !referer) {
+    return next();
+  }
+
+  const PUBLIC_URL = process.env.PUBLIC_URL || `http://localhost:${PORT}`;
+  const allowedOrigins = [
+    PUBLIC_URL,
+    `http://localhost:${PORT}`,
+    `http://127.0.0.1:${PORT}`,
+    'https://speedchat-6gxy.onrender.com'
+  ];
+
+  const checkOrigin = origin || referer;
+  const isAllowed = allowedOrigins.some(allowed => checkOrigin.startsWith(allowed));
+
+  if (!isAllowed) {
+    return res.status(403).json({ error: 'Origem não permitida.' });
+  }
+
+  next();
+});
+
 app.use(express.static(path.join(__dirname, '../public')));
 
 app.use('/auth', authRoutes);

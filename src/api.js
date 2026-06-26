@@ -2,7 +2,7 @@ const express = require('express');
 const { v4: uuidv4 } = require('uuid');
 const bcrypt = require('bcryptjs');
 const db = require('./db');
-const { sanitizeContent } = require('./sanitize');
+const { sanitizeContent, stripScriptTags } = require('./sanitize');
 const { broadcastAvatarUpdate, broadcastGroupDeleted } = require('./ws');
 
 const router = express.Router();
@@ -338,13 +338,13 @@ router.put('/profile', requireAuth, (req, res) => {
     avatarChanged = true;
   }
 
-  // Salva recado (bio)
+  // Salva recado (bio) — sanitizado
   if (req.body.bio !== undefined) {
     const bio = String(req.body.bio).trim();
     if (bio.length > 150) {
       return res.status(400).json({ error: 'O recado deve ter no máximo 150 caracteres.' });
     }
-    user.bio = bio;
+    user.bio = stripScriptTags(bio);
   }
 
   db.write(data);
@@ -392,7 +392,6 @@ router.get('/users', requireAuth, (req, res) => {
     username: u.username,
     avatarColor: u.avatarColor,
     avatarData: u.avatarData || null,
-    bio: u.bio || '',
     isAdmin: u.isAdmin || false
   }));
   res.json(users);
@@ -476,15 +475,15 @@ router.post('/rooms/:roomId/join', requireAuth, (req, res) => {
     return res.status(400).json({ error: 'Não pode entrar em conversas privadas.' });
   }
 
-  // Verifica senha com bcrypt (compatível com senhas antigas em plain text)
+  // Verifica senha com bcrypt
   function checkPassword(roomPass, inputPass) {
     if (!roomPass || !inputPass) return false;
-    // Se começa com $2 (hash bcrypt), compara com bcrypt
+    // Senhas SEMPRE hasheadas com bcrypt ($2a$, $2b$ ou $2y$)
     if (roomPass.startsWith('$2')) {
       return bcrypt.compareSync(inputPass.trim(), roomPass);
     }
-    // Fallback pra senha antiga em plain text
-    return inputPass.trim() === roomPass;
+    // Se não for hash bcrypt, ignora (senha antiga plain text inválida)
+    return false;
   }
 
   // Se já é membro, verifica senha mesmo assim (se o grupo tiver senha)

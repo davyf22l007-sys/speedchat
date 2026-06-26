@@ -6,6 +6,9 @@ const clients = new Map();
 const typingTimers = new Map();
 const recentMessages = new Map(); // dedup: authorId+content -> timestamp
 
+// Rate limit por client: max X mensagens por janela Y
+const wsRateLimit = new Map(); // clientId -> [{timestamp}]
+
 function getRoomMembers(roomId) {
   const data = db.read();
   const room = data.rooms.find(r => r.id === roomId);
@@ -87,7 +90,33 @@ function setupWebSocket(wss) {
 
 const processedMsgIds = new Set(); // dedup global por ID
 
+function checkWsRateLimit(clientId) {
+  const now = Date.now();
+  const window = 10000; // 10 segundos
+  const max = 15; // max 15 mensagens por janela
+
+  if (!wsRateLimit.has(clientId)) {
+    wsRateLimit.set(clientId, []);
+  }
+
+  const timestamps = wsRateLimit.get(clientId);
+  // Remove timestamps fora da janela
+  while (timestamps.length > 0 && timestamps[0] < now - window) {
+    timestamps.shift();
+  }
+
+  if (timestamps.length >= max) {
+    return false; // Rate limit excedido
+  }
+
+  timestamps.push(now);
+  return true;
+}
+
 function handleMessage(clientId, msg) {
+  // Rate limit por client
+  if (!checkWsRateLimit(clientId)) return;
+
   // Dedup: ignorar mesma mensagem em menos de 10s
   if (msg.content) {
     const dedupKey = clientId + ':' + msg.content + ':' + (msg.roomId || '');
