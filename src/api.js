@@ -1,6 +1,8 @@
 const express = require('express');
 const { v4: uuidv4 } = require('uuid');
+const bcrypt = require('bcryptjs');
 const db = require('./db');
+const { sanitizeContent } = require('./sanitize');
 const { broadcastAvatarUpdate, broadcastGroupDeleted } = require('./ws');
 
 const router = express.Router();
@@ -116,7 +118,7 @@ router.post('/rooms/:roomId/messages', requireAuth, (req, res) => {
     roomId: req.params.roomId,
     authorId: req.userId,
     authorName: user.username,
-    content: content.trim(),
+    content: sanitizeContent(content),
     timestamp: new Date().toISOString()
   };
 
@@ -256,7 +258,7 @@ router.put('/rooms/:roomId/messages/:messageId', requireAuth, (req, res) => {
   if (msg.authorId !== req.userId) return res.status(403).json({ error: 'Você só pode editar suas próprias mensagens.' });
   if (msg.deleted) return res.status(400).json({ error: 'Mensagem deletada.' });
 
-  msg.content = content.trim();
+  msg.content = sanitizeContent(content);
   msg.edited = true;
   db.write(data);
 
@@ -474,9 +476,20 @@ router.post('/rooms/:roomId/join', requireAuth, (req, res) => {
     return res.status(400).json({ error: 'Não pode entrar em conversas privadas.' });
   }
 
+  // Verifica senha com bcrypt (compatível com senhas antigas em plain text)
+  function checkPassword(roomPass, inputPass) {
+    if (!roomPass || !inputPass) return false;
+    // Se começa com $2 (hash bcrypt), compara com bcrypt
+    if (roomPass.startsWith('$2')) {
+      return bcrypt.compareSync(inputPass.trim(), roomPass);
+    }
+    // Fallback pra senha antiga em plain text
+    return inputPass.trim() === roomPass;
+  }
+
   // Se já é membro, verifica senha mesmo assim (se o grupo tiver senha)
   if (room.members.includes(req.userId)) {
-    if (room.password && (!password || password.trim() !== room.password)) {
+    if (room.password && !checkPassword(room.password, password)) {
       return res.status(403).json({ error: 'Senha incorreta.' });
     }
     return res.json({ ok: true, alreadyMember: true });
@@ -484,7 +497,7 @@ router.post('/rooms/:roomId/join', requireAuth, (req, res) => {
 
   // Verifica senha pra quem não é membro
   if (room.password) {
-    if (!password || password.trim() !== room.password) {
+    if (!password || !checkPassword(room.password, password)) {
       return res.status(403).json({ error: 'Senha incorreta.' });
     }
   }

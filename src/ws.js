@@ -1,5 +1,6 @@
 const { v4: uuidv4 } = require('uuid');
 const db = require('./db');
+const { sanitizeContent } = require('./sanitize');
 
 const clients = new Map();
 const typingTimers = new Map();
@@ -122,7 +123,7 @@ function handleMessage(clientId, msg) {
     authorId: client.userId,
     authorName: client.username,
     authorAvatarData: user?.avatarData || null,
-    content: content.trim(),
+    content: sanitizeContent(content),
     type: msgType || 'text',
     timestamp: new Date().toISOString(),
     edited: false,
@@ -234,7 +235,7 @@ function handleEditMessage(clientId, msg) {
   if (data.messages[msgIndex].authorId !== client.userId) return;
   if (data.messages[msgIndex].deleted) return;
 
-  data.messages[msgIndex].content = content.trim();
+  data.messages[msgIndex].content = sanitizeContent(content);
   data.messages[msgIndex].edited = true;
   db.write(data);
 

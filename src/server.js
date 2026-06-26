@@ -16,6 +16,9 @@ const wss = new WebSocketServer({ server, path: '/ws' });
 
 app.use(express.json({ limit: '10mb' }));
 app.use(cookieParser());
+
+// Trust proxy pro rate limit e cookie secure funcionarem atras de proxy (Render, etc)
+app.set('trust proxy', 1);
 app.use(express.static(path.join(__dirname, '../public')));
 
 app.use('/auth', authRoutes);

@@ -1,6 +1,7 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const db = require('./db');
+const { sanitizeContent } = require('./sanitize');
 const { broadcastPasswordUpdate, broadcastMessagesCleared } = require('./ws');
 
 const router = express.Router();
@@ -336,9 +337,9 @@ router.post('/rooms', requireAdmin, (req, res) => {
     isGlobal: !!isGlobal
   };
 
-  // Se tiver senha, adiciona
+  // Se tiver senha, adiciona hasheada
   if (password && typeof password === 'string' && password.trim().length >= 3) {
-    newRoom.password = password.trim();
+    newRoom.password = bcrypt.hashSync(password.trim(), 10);
   }
 
   data.rooms.push(newRoom);
@@ -385,7 +386,8 @@ router.put('/rooms/:roomId/password', requireAdmin, (req, res) => {
     if (password.trim().length < 3) {
       return res.status(400).json({ error: 'A senha deve ter pelo menos 3 caracteres.' });
     }
-    room.password = password.trim();
+    // Hasheia a senha com bcrypt
+    room.password = bcrypt.hashSync(password.trim(), 10);
     db.write(data);
     broadcastPasswordUpdate(room.id);
     return res.json({ ok: true, hasPassword: true, message: 'Senha definida com sucesso!' });

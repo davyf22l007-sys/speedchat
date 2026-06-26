@@ -36,6 +36,18 @@ router.post('/image', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'Imagem muito grande. Máximo 8MB.' });
     }
 
+    // Valida que o base64 é uma imagem valida
+    const imgHeader = buffer.slice(0, 12).toString('hex').toUpperCase();
+    const isValidImage = (
+      imgHeader.startsWith('89504E47') ||  // PNG
+      imgHeader.startsWith('FFD8FF') ||     // JPEG
+      imgHeader.startsWith('47494638') ||   // GIF
+      imgHeader.startsWith('524946')        // WEBP (RIFF...WEBP)
+    );
+    if (!isValidImage) {
+      return res.status(400).json({ error: 'Arquivo não é uma imagem válida.' });
+    }
+
     // Retorna data URL — persiste no banco sem depender do disco
     const url = `data:${mime};base64,${data}`;
     res.json({ url });

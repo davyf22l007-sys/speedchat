@@ -1,9 +1,27 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const { v4: uuidv4 } = require('uuid');
+const rateLimit = require('express-rate-limit');
 const db = require('./db');
 
 const router = express.Router();
+
+// Rate limit: max 10 tentativas por minuto por IP
+const authLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  message: { error: 'Muitas tentativas. Tente novamente em 1 minuto.' },
+  standardHeaders: true,
+  legacyHeaders: false
+});
+
+const isSecure = process.env.NODE_ENV === 'production' || process.env.PUBLIC_URL?.startsWith('https');
+const COOKIE_OPTIONS = {
+  httpOnly: true,
+  sameSite: 'strict',
+  secure: isSecure,
+  maxAge: 7 * 24 * 60 * 60 * 1000
+};
 
 const AVATAR_COLORS = [
   '#25D366', '#7B61FF', '#FF6B6B', '#F7B731', '#2BCBBA',
@@ -11,7 +29,7 @@ const AVATAR_COLORS = [
 ];
 
 // ── REGISTER ──────────────────────────────────────────────
-router.post('/register', (req, res) => {
+router.post('/register', authLimiter, (req, res) => {
   const { username, password } = req.body;
 
   if (!username || !password) {
@@ -68,10 +86,7 @@ router.post('/register', (req, res) => {
   data.sessions[token] = { userId: newUser.id, createdAt: new Date().toISOString() };
   db.write(data);
 
-  res.cookie('session', token, {
-    httpOnly: true,
-    maxAge: 7 * 24 * 60 * 60 * 1000
-  });
+  res.cookie('session', token, COOKIE_OPTIONS);
 
   res.status(201).json({
     id: newUser.id,
@@ -85,7 +100,7 @@ router.post('/register', (req, res) => {
 });
 
 // ── LOGIN ─────────────────────────────────────────────────
-router.post('/login', (req, res) => {
+router.post('/login', authLimiter, (req, res) => {
   const { username, password } = req.body;
 
   if (!username || !password) {
@@ -103,10 +118,7 @@ router.post('/login', (req, res) => {
   data.sessions[token] = { userId: user.id, createdAt: new Date().toISOString() };
   db.write(data);
 
-  res.cookie('session', token, {
-    httpOnly: true,
-    maxAge: 7 * 24 * 60 * 60 * 1000
-  });
+  res.cookie('session', token, COOKIE_OPTIONS);
 
   res.json({
     id: user.id,
