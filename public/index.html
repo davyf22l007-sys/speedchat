@@ -597,12 +597,16 @@
 </div>
 
 <!-- Dropdown do chat -->
-<div class="header-dropdown hidden" id="chat-dropdown">
-  <button class="dropdown-item" id="clear-chat-btn">
-    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#3b4a54" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>
-    Limpar Conversa
-  </button>
-</div>
+<div class="header-dropdown hidden" id="chat-dropdown">          <button class="dropdown-item" id="clear-chat-btn">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#3b4a54" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>
+            Limpar Conversa
+          </button>
+          <div class="dropdown-divider" id="admin-clear-divider" style="display:none"></div>
+          <button class="dropdown-item dropdown-item--danger" id="admin-clear-msgs-btn" style="display:none">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#e53935" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>
+            Apagar Msgs do Grupo
+          </button>
+        </div>
 
 <!-- Modal de imagem -->
 <div id="image-modal" class="hidden">

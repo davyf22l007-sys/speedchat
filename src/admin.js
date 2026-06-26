@@ -1,7 +1,7 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const db = require('./db');
-const { broadcastPasswordUpdate } = require('./ws');
+const { broadcastPasswordUpdate, broadcastMessagesCleared } = require('./ws');
 
 const router = express.Router();
 
@@ -543,6 +543,32 @@ router.post('/users/:userId/toggle-admin', requireSuperAdmin, (req, res) => {
 
   const action = isAdmin ? 'promovido' : 'rebaixado';
   res.json({ ok: true, message: `Usuário ${action} com sucesso!`, isAdmin: user.isAdmin });
+});
+
+// ── APAGAR TODAS AS MENSAGENS DE UM GRUPO (admin) ───────
+router.delete('/rooms/:roomId/messages', requireAdmin, (req, res) => {
+  const data = db.read();
+  const room = data.rooms.find(r => r.id === req.params.roomId);
+
+  if (!room) {
+    return res.status(404).json({ error: 'Sala não encontrada.' });
+  }
+
+  if (room.isDM) {
+    return res.status(400).json({ error: 'Não pode apagar mensagens de conversas privadas.' });
+  }
+
+  // Remove todas as mensagens do grupo
+  const before = data.messages.length;
+  data.messages = data.messages.filter(m => m.roomId !== room.id);
+  const removed = before - data.messages.length;
+
+  db.write(data);
+
+  // Avisa todos os membros via websocket
+  broadcastMessagesCleared(room.id);
+
+  res.json({ ok: true, removed });
 });
 
 module.exports = router;

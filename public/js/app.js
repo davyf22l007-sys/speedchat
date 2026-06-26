@@ -816,6 +816,9 @@ function connectWebSocket() {
           passwordVerifiedRooms.delete(msg.roomId);
           loadRooms();
           break;
+        case 'messages_cleared':
+          handleMessagesCleared(msg.roomId);
+          break;
       }
     } catch (err) {
       console.warn('WS erro:', err);
@@ -912,6 +915,16 @@ async function handleNewMessage(message) {
   }
   updateRoomPreview(message);
   updateTitle();
+}
+
+function handleMessagesCleared(roomId) {
+  // Se a sala atual foi limpa, limpa o container
+  if (roomId === currentRoomId) {
+    $('messages-container').innerHTML = '';
+    messagesCache[roomId] = [];
+  }
+  // Recarrega a lista pra atualizar previews
+  loadRooms();
 }
 
 function handleMessageDeleted(messageId, roomId) {
@@ -2018,6 +2031,13 @@ chatMenuBtn.addEventListener('click', e => {
     const rect = chatMenuBtn.getBoundingClientRect();
     chatDropdown.style.top = (rect.bottom + 6) + 'px';
     chatDropdown.style.right = (window.innerWidth - rect.right) + 'px';
+    // Atualiza visibilidade do botao admin de apagar msgs
+    var _r = rooms.find(function(r) { return r.id === currentRoomId; });
+    var _isG = _r && !_r.isDM;
+    var _isA = currentUser && currentUser.isAdmin;
+    var _b = document.getElementById('admin-clear-msgs-btn');
+    var _d = document.getElementById('admin-clear-divider');
+    if (_b && _d) { _b.style.display = (_isG && _isA) ? 'flex' : 'none'; _d.style.display = (_isG && _isA) ? 'block' : 'none'; }
   }
   chatDropdown.classList.toggle('hidden');
 });
@@ -2032,7 +2052,7 @@ chatDropdown.querySelectorAll('.dropdown-item').forEach(item => {
   item.addEventListener('click', () => chatDropdown.classList.add('hidden'));
 });
 
-// ── LIMPAR CONVERSA ───────────────────────────────────────
+// ── LIMPAR CONVERSA (usuário) ──────────────────────────────
 $('clear-chat-btn').addEventListener('click', async () => {
   if (!currentRoomId) return;
   const ok = await showConfirm('Tem certeza que deseja limpar as mensagens?');
@@ -2041,6 +2061,37 @@ $('clear-chat-btn').addEventListener('click', async () => {
   if (res.ok) {
     $('messages-container').innerHTML = '';
     showToast('Conversa limpa!');
+  }
+});
+
+// ── APAGAR TODAS AS MENSAGENS DO GRUPO (admin) ────────────
+$('admin-clear-msgs-btn').addEventListener('click', async () => {
+  if (!currentRoomId) return;
+  const room = rooms.find(r => r.id === currentRoomId);
+  if (!room || room.isDM) return;
+  const roomName = room.name;
+  const ok = await showConfirm(`Tem certeza que deseja apagar TODAS as mensagens do grupo "${escapeHtml(roomName)}"? Esta ação é irreversível e afeta todos os membros.`);
+  if (!ok) return;
+  
+  const btn = $('admin-clear-msgs-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span style="opacity:.6">Apagando…</span>';
+  try {
+    const res = await fetch(`${API}/admin/rooms/${currentRoomId}/messages`, { method: 'DELETE' });
+    if (!res.ok) {
+      const err = await res.json();
+      showToast(err.error || 'Erro ao apagar mensagens');
+      return;
+    }
+    const data = await res.json();
+    $('messages-container').innerHTML = '';
+    messagesCache[currentRoomId] = [];
+    showToast(`${data.removed} mensagem(ns) apagada(s)!`);
+  } catch {
+    showToast('Erro de conexão.');
+  } finally {
+    btn.innerHTML = 'Apagar Msgs do Grupo';
+    btn.disabled = false;
   }
 });
 
