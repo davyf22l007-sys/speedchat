@@ -437,7 +437,7 @@ async function openRoom(room) {
   // Mostra/esconde badge de admin no header
   var _badge = $('chat-admin-badge');
   if (_badge) {
-    _badge.style.display = (!room.isDM && currentUser && currentUser.isAdmin) ? '' : 'none';
+    _badge.classList.toggle('hidden', room.isDM || !currentUser || !currentUser.isAdmin);
   }
 
   // Tenta usar cache primeiro
