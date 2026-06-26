@@ -275,6 +275,12 @@ router.put('/rooms/:roomId/global', requireAdmin, (req, res) => {
   }
 
   const { isGlobal } = req.body;
+
+  // Se for marcar como global mas tem senha, bloqueia
+  if (isGlobal && room.password) {
+    return res.status(400).json({ error: 'Grupos com senha não podem ser globais. Remova a senha primeiro.' });
+  }
+
   room.isGlobal = !!isGlobal;
 
   // Quando marca como global, add automaticamente todos os users existentes
@@ -337,8 +343,11 @@ router.post('/rooms', requireAdmin, (req, res) => {
     isGlobal: !!isGlobal
   };
 
-  // Se tiver senha, adiciona hasheada
+  // Se tiver senha, adiciona hasheada (e não pode ser global)
   if (password && typeof password === 'string' && password.trim().length >= 3) {
+    if (newRoom.isGlobal) {
+      return res.status(400).json({ error: 'Grupos globais não podem ter senha.' });
+    }
     newRoom.password = bcrypt.hashSync(password.trim(), 10);
   }
 
@@ -386,6 +395,12 @@ router.put('/rooms/:roomId/password', requireAdmin, (req, res) => {
     if (password.trim().length < 3) {
       return res.status(400).json({ error: 'A senha deve ter pelo menos 3 caracteres.' });
     }
+
+    // Não permite senha em grupos globais
+    if (room.isGlobal) {
+      return res.status(400).json({ error: 'Grupos globais não podem ter senha. Desmarque como global primeiro.' });
+    }
+
     // Hasheia a senha com bcrypt
     room.password = bcrypt.hashSync(password.trim(), 10);
     db.write(data);
@@ -500,6 +515,15 @@ router.post('/rooms/:roomId/add-all-users', requireAdmin, (req, res) => {
 
   if (!room) {
     return res.status(404).json({ error: 'Sala não encontrada.' });
+  }
+
+  if (room.isDM) {
+    return res.status(400).json({ error: 'Não pode adicionar usuários em conversas privadas.' });
+  }
+
+  // Não permite add todos em grupos com senha (burla a proteção)
+  if (room.password) {
+    return res.status(400).json({ error: 'Grupos com senha não podem receber adição em massa. Remova a senha primeiro.' });
   }
 
   let added = 0;

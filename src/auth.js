@@ -72,13 +72,14 @@ router.post('/register', authLimiter, (req, res) => {
 
   data.users.push(newUser);
 
-  // Adiciona à sala geral e a todos os grupos globais
+  // Adiciona à sala geral e a todos os grupos globais (exceto os com senha)
   const general = data.rooms.find(r => r.id === 'room_general');
   if (general && !general.members.includes(newUser.id)) {
     general.members.push(newUser.id);
   }
   data.rooms.forEach(r => {
-    if (r.isGlobal && !r.members.includes(newUser.id)) {
+    // Não adiciona automaticamente em grupos globais que tem senha
+    if (r.isGlobal && !r.password && !r.members.includes(newUser.id)) {
       r.members.push(newUser.id);
     }
   });
